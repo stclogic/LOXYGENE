@@ -1,0 +1,148 @@
+"use client";
+
+import { useState } from "react";
+import { Icon } from "@iconify/react";
+import { useRoomStore } from "@/lib/store/roomStore";
+
+interface GiftParticle {
+  id: number;
+  x: number;
+  y: number;
+  emoji: string;
+}
+
+export function BottomActionBar() {
+  const {
+    isMicOn, isCameraOn, toggleMic, toggleCamera,
+    isInQueue, queuePosition, joinQueue, leaveQueue, sendGift,
+  } = useRoomStore();
+  const [particles, setParticles] = useState<GiftParticle[]>([]);
+
+  const triggerGift = (type: "bouquet" | "champagne") => {
+    sendGift({ type, fromUser: "나", toUser: "별빛가수" });
+    const newParticles: GiftParticle[] = Array.from({ length: 8 }, (_, i) => ({
+      id: Date.now() + i,
+      x: Math.random() * 100 - 50,
+      y: Math.random() * -80 - 20,
+      emoji: type === "bouquet" ? "💐" : "🍾",
+    }));
+    setParticles((prev) => [...prev, ...newParticles]);
+    setTimeout(() => {
+      setParticles((prev) => prev.filter((p) => !newParticles.find((n) => n.id === p.id)));
+    }, 900);
+  };
+
+  return (
+    <div
+      className="relative flex items-end justify-between gap-2 sm:gap-3 px-2 sm:px-4 py-2.5 rounded-2xl"
+      style={{
+        background: "rgba(7,7,7,0.95)",
+        border: "1px solid rgba(255,255,255,0.06)",
+        backdropFilter: "blur(20px)",
+      }}
+    >
+      {/* Particles */}
+      {particles.map((p) => (
+        <div key={p.id} className="pointer-events-none absolute text-2xl z-50"
+          style={{ bottom: "100%", left: "50%", transform: `translate(${p.x}px, ${p.y}px)`, animation: "particle-burst 0.8s ease-out forwards" }}>
+          {p.emoji}
+        </div>
+      ))}
+
+      {/* ── Left: Mic + Camera ── */}
+      <div className="flex items-end gap-2">
+
+        {/* Mic */}
+        <button
+          onClick={toggleMic}
+          className="flex flex-col items-center justify-center gap-1 min-w-[44px] min-h-[44px] rounded-xl px-2 py-2 transition-all duration-200 active:scale-95"
+          style={{
+            background: isMicOn ? "rgba(0,229,255,0.15)" : "rgba(255,50,50,0.1)",
+            border: isMicOn ? "1px solid rgba(0,229,255,0.4)" : "1px solid rgba(255,50,50,0.3)",
+          }}
+        >
+          <Icon
+            icon={isMicOn ? "solar:microphone-bold" : "solar:microphone-slash-bold"}
+            className="text-xl lg:text-base w-6 h-6 lg:w-5 lg:h-5"
+            style={{ color: isMicOn ? "#00E5FF" : "#ff5555" }}
+          />
+          <span className="text-[10px] leading-none lg:hidden" style={{ color: isMicOn ? "#00E5FF" : "#ff5555" }}>
+            마이크
+          </span>
+        </button>
+
+        {/* Camera */}
+        <button
+          onClick={toggleCamera}
+          className="flex flex-col items-center justify-center gap-1 min-w-[44px] min-h-[44px] rounded-xl px-2 py-2 transition-all duration-200 active:scale-95"
+          style={{
+            background: isCameraOn ? "rgba(0,229,255,0.15)" : "rgba(255,255,255,0.04)",
+            border: isCameraOn ? "1px solid rgba(0,229,255,0.4)" : "1px solid rgba(255,255,255,0.08)",
+          }}
+        >
+          <Icon
+            icon={isCameraOn ? "solar:camera-bold" : "solar:camera-slash-bold"}
+            className="text-xl lg:text-base w-6 h-6 lg:w-5 lg:h-5"
+            style={{ color: isCameraOn ? "#00E5FF" : "rgba(255,255,255,0.4)" }}
+          />
+          <span className="text-[10px] leading-none text-white/50 lg:hidden">카메라</span>
+        </button>
+      </div>
+
+      {/* ── Center: Join Queue ── */}
+      <button
+        onClick={isInQueue ? leaveQueue : joinQueue}
+        className="flex flex-col items-center justify-center gap-1 min-h-[44px] flex-1 lg:flex-none px-2 lg:px-4 py-2 rounded-xl font-semibold transition-all duration-200 active:scale-95"
+        style={
+          isInQueue
+            ? { background: "rgba(255,0,127,0.15)", border: "1px solid rgba(255,0,127,0.4)", color: "#FF007F", boxShadow: "0 0 15px rgba(255,0,127,0.3)" }
+            : { background: "rgba(0,229,255,0.1)", border: "1px solid rgba(0,229,255,0.4)", color: "#00E5FF", boxShadow: "0 0 10px rgba(0,229,255,0.2)" }
+        }
+      >
+        {/* Desktop: icon + text inline */}
+        <div className="hidden lg:flex items-center gap-2">
+          <Icon icon={isInQueue ? "solar:close-circle-bold" : "solar:microphone-bold"} className="w-4 h-4" />
+          <span className="text-sm">{isInQueue ? `대기 중 (${queuePosition}번)` : "마이크 잡기"}</span>
+        </div>
+        {/* Mobile: icon stacked + label */}
+        <Icon icon={isInQueue ? "solar:close-circle-bold" : "solar:microphone-bold"} className="lg:hidden text-xl w-6 h-6" />
+        <span className="text-[10px] leading-none lg:hidden">
+          {isInQueue ? `${queuePosition}번 대기` : "마이크잡기"}
+        </span>
+      </button>
+
+      {/* ── Right: Gifts + F&B ── */}
+      <div className="flex items-end gap-2">
+
+        {/* Bouquet */}
+        <button
+          onClick={() => triggerGift("bouquet")}
+          className="flex flex-col items-center justify-center gap-1 min-w-[44px] min-h-[44px] rounded-xl px-2 py-2 transition-all duration-200 active:scale-95"
+          style={{ background: "rgba(255,0,127,0.12)", border: "1px solid rgba(255,0,127,0.35)" }}
+        >
+          <span className="text-xl leading-none">💐</span>
+          <span className="text-[10px] leading-none text-[#FF007F]">꽃다발</span>
+        </button>
+
+        {/* Champagne */}
+        <button
+          onClick={() => triggerGift("champagne")}
+          className="flex flex-col items-center justify-center gap-1 min-w-[44px] min-h-[44px] rounded-xl px-2 py-2 transition-all duration-200 active:scale-95"
+          style={{ background: "rgba(255,215,0,0.08)", border: "1px solid rgba(255,215,0,0.25)" }}
+        >
+          <span className="text-xl leading-none">🍾</span>
+          <span className="text-[10px] leading-none text-yellow-400/70">샴페인</span>
+        </button>
+
+        {/* F&B — hidden below 375px */}
+        <button
+          className="hidden min-[375px]:flex flex-col items-center justify-center gap-1 min-w-[44px] min-h-[44px] rounded-xl px-2 py-2 transition-all duration-200 active:scale-95"
+          style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}
+        >
+          <Icon icon="solar:wine-glass-bold" className="text-xl lg:text-base w-6 h-6 lg:w-5 lg:h-5 text-white/40" />
+          <span className="text-[10px] leading-none text-white/30 lg:hidden">F&amp;B</span>
+        </button>
+      </div>
+    </div>
+  );
+}

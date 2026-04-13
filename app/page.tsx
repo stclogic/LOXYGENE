@@ -733,7 +733,7 @@ function Home() {
               <h2 className="text-2xl sm:text-3xl lg:text-4xl tracking-tight font-medium text-transparent bg-clip-text bg-gradient-to-r from-white via-white/90 to-white/50 drop-shadow-lg">
                 {t.hero.tagline}
               </h2>
-              <Link href="/rooms/colosseum"
+              <Link href="/rooms/colosseum/room-001"
                 className="relative mt-1 sm:mt-2 px-5 sm:px-8 py-3 sm:py-4 bg-[#FF007F]/10 border border-[#FF007F]/50 rounded-full overflow-hidden transition-all hover:scale-[1.02] active:scale-95 group/btn"
                 style={{ animation: "pulse-glow-pink 3s infinite" }}>
                 <div className="absolute inset-0 bg-gradient-to-r from-transparent via-[#FF007F]/20 to-transparent -translate-x-full group-hover/btn:animate-[shimmer_1.5s_infinite]" />

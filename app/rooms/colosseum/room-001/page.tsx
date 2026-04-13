@@ -12,7 +12,7 @@ import { QuickCallModal } from "@/components/entertainers/QuickCallModal";
 
 const SONG_TITLE = "안동역에서";
 const ARTIST_NAME = "진성";
-const YOUTUBE_ID = "zBRBPDQgDTk";
+const YOUTUBE_ID = "L26jSx5TZns";
 const SONG_END_TIME = 160;
 
 const MOCK_QUEUE = [
@@ -229,7 +229,7 @@ export default function ColosseumRoom001Page() {
                 <iframe
                   key="yt-iframe"
                   className="absolute inset-0 w-full h-full"
-                  src={`https://www.youtube.com/embed/${YOUTUBE_ID}?autoplay=1&controls=0&modestbranding=1&rel=0&iv_load_policy=3&enablejsapi=1`}
+                  src={`https://www.youtube.com/embed/${YOUTUBE_ID}?autoplay=1&controls=0&modestbranding=1&rel=0&enablejsapi=1`}
                   title={`${SONG_TITLE} - ${ARTIST_NAME}`}
                   allow="autoplay; encrypted-media"
                   allowFullScreen

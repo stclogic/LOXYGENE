@@ -14,8 +14,14 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "L'Oxygène — Virtual Social Lounge",
-  description: "A high-end virtual social lounge experience",
+  title: "L'Oxygène | High-End Digital Nightlife",
+  description: "하이엔드 가상 소셜 라운지. 가라오케, 파티, VVIP 룸.",
+  keywords: "가라오케, 온라인 파티, 화상채팅, 노래방, 하이엔드 클럽",
+  openGraph: {
+    title: "L'Oxygène",
+    description: "하이엔드 가상 소셜 라운지",
+    type: "website",
+  },
 };
 
 export default function RootLayout({

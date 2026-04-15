@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "check-env": "node scripts/check-env.js",
+    "predev": "node scripts/check-env.js"
   },
   "dependencies": {
     "@iconify/react": "^6.0.2",

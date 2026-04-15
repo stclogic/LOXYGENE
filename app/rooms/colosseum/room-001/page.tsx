@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import { Icon } from "@iconify/react";
 import Link from "next/link";
 import { Leaderboard } from "@/components/room/Leaderboard";
@@ -8,12 +9,21 @@ import { BottomActionBar } from "@/components/room/BottomActionBar";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { useRoomStore } from "@/lib/store/roomStore";
 import { QuickCallModal } from "@/components/entertainers/QuickCallModal";
+import RoomLoadingScreen from "@/components/room/RoomLoadingScreen";
 
-// New components
-import ZoomVideoRoom from "@/components/room/ZoomVideoRoom";
+// Heavy components — lazy-loaded, no SSR (use browser APIs)
+const ZoomVideoRoom = dynamic(
+  () => import("@/components/room/ZoomVideoRoom"),
+  { ssr: false, loading: () => <RoomLoadingScreen /> }
+);
+const ReactiveBackground = dynamic(
+  () => import("@/components/room/ReactiveBackground"),
+  { ssr: false }
+);
+
+// Other room components
 import MainStage from "@/components/room/MainStage";
 import ParticipantRow, { type RoomParticipant } from "@/components/room/ParticipantRow";
-import ReactiveBackground from "@/components/room/ReactiveBackground";
 import VoiceScoreDisplay from "@/components/room/VoiceScoreDisplay";
 import DuetMode, { type DuetSinger } from "@/components/room/DuetMode";
 import AudienceReactions, { type AudienceReactionsHandle } from "@/components/room/AudienceReactions";

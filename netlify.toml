@@ -2,5 +2,26 @@
   command = "npm run build"
   publish = ".next"
 
+[build.environment]
+  NEXT_TELEMETRY_DISABLED = "1"
+  NODE_VERSION = "20"
+
 [[plugins]]
   package = "@netlify/plugin-nextjs"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "SAMEORIGIN"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=*, microphone=*, display-capture=*"
+
+[[headers]]
+  for = "/rooms/*"
+  [headers.values]
+    Permissions-Policy = "camera=*, microphone=*, display-capture=*"
+
+[dev]
+  command = "npm run dev"
+  port = 3000

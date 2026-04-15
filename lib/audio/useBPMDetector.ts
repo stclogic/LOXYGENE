@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 export interface UseBPMDetectorReturn {
   currentBPM: number;
   beatDetected: boolean;
+  audioLevel: number;   // 0–1, current volume (RMS scaled)
   isAnalyzing: boolean;
   startAnalysis: (source?: MediaStream | HTMLMediaElement) => Promise<void>;
   stopAnalysis: () => void;
@@ -22,6 +23,7 @@ const BEAT_THRESHOLD_RATIO = 1.35; // energy must exceed 1.35× recent average
 export function useBPMDetector(): UseBPMDetectorReturn {
   const [currentBPM, setCurrentBPM] = useState(0);
   const [beatDetected, setBeatDetected] = useState(false);
+  const [audioLevel, setAudioLevel] = useState(0);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   const audioCtxRef = useRef<AudioContext | null>(null);
@@ -49,6 +51,7 @@ export function useBPMDetector(): UseBPMDetectorReturn {
     setIsAnalyzing(false);
     setCurrentBPM(0);
     setBeatDetected(false);
+    setAudioLevel(0);
   }, []);
 
   const startAnalysis = useCallback(async (
@@ -101,6 +104,9 @@ export function useBPMDetector(): UseBPMDetectorReturn {
       for (let i = 0; i < buffer.length; i++) sumSq += buffer[i] * buffer[i];
       const rms = Math.sqrt(sumSq / buffer.length);
 
+      // Expose audio level (0–1), scaled so typical voice ≈ 0.3–0.7
+      setAudioLevel(Math.min(1, rms * 8));
+
       // Maintain rolling energy history (last 43 frames ≈ ~1s at 60fps)
       energyHistoryRef.current.push(rms);
       if (energyHistoryRef.current.length > 43) energyHistoryRef.current.shift();
@@ -139,7 +145,7 @@ export function useBPMDetector(): UseBPMDetectorReturn {
           }
         }
 
-        // Flash beatDetected for one frame
+        // Flash beatDetected for ~80ms
         setBeatDetected(true);
         if (beatFlashTimerRef.current) clearTimeout(beatFlashTimerRef.current);
         beatFlashTimerRef.current = setTimeout(() => setBeatDetected(false), 80);
@@ -157,5 +163,5 @@ export function useBPMDetector(): UseBPMDetectorReturn {
     if (beatFlashTimerRef.current) clearTimeout(beatFlashTimerRef.current);
   }, [stopAnalysis]);
 
-  return { currentBPM, beatDetected, isAnalyzing, startAnalysis, stopAnalysis };
+  return { currentBPM, beatDetected, audioLevel, isAnalyzing, startAnalysis, stopAnalysis };
 }

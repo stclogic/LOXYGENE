@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Icon } from "@iconify/react";
 import { MainViewport } from "@/components/room/MainViewport";
 import { SyncLyricBar } from "@/components/room/SyncLyricBar";
@@ -11,6 +11,7 @@ import { GlassCard } from "@/components/ui/GlassCard";
 import { useRoomStore } from "@/lib/store/roomStore";
 import Link from "next/link";
 import { QuickCallModal } from "@/components/entertainers/QuickCallModal";
+import { hasNickname, setUserNickname, randomNickname } from "@/lib/utils/userSession";
 
 const MOCK_QUEUE = [
   { id: "q1", nickname: "가을바람", songTitle: "사랑했지만 (김광석)", position: 1 },
@@ -24,6 +25,26 @@ export default function ColosseumRoomPage({ params }: { params: { roomId: string
   const [lastGift, setLastGift] = useState<string | null>(null);
   const [directorOpen, setDirectorOpen] = useState(false);
   const gifts = useRoomStore((s) => s.gifts);
+
+  // Nickname modal
+  const [nicknameModalOpen, setNicknameModalOpen] = useState(false);
+  const [nicknameInput, setNicknameInput] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!hasNickname()) setNicknameModalOpen(true);
+  }, []);
+
+  useEffect(() => {
+    if (nicknameModalOpen) setTimeout(() => inputRef.current?.focus(), 50);
+  }, [nicknameModalOpen]);
+
+  const handleNicknameSubmit = () => {
+    const name = nicknameInput.trim();
+    if (!name) return;
+    setUserNickname(name);
+    setNicknameModalOpen(false);
+  };
 
   useEffect(() => {
     if (gifts.length > 0) {
@@ -180,6 +201,50 @@ export default function ColosseumRoomPage({ params }: { params: { roomId: string
         <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 px-5 py-2.5 rounded-full font-semibold text-sm whitespace-nowrap"
           style={{ background: "rgba(255,0,127,0.15)", border: "1px solid rgba(255,0,127,0.4)", color: "#FF007F", boxShadow: "0 0 20px rgba(255,0,127,0.3)" }}>
           {lastGift}
+        </div>
+      )}
+
+      {/* Nickname entry modal */}
+      {nicknameModalOpen && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center px-4"
+          style={{ background: "rgba(0,0,0,0.88)", backdropFilter: "blur(12px)" }}>
+          <div className="w-full max-w-sm rounded-2xl p-7 flex flex-col gap-5"
+            style={{ background: "rgba(10,10,10,0.99)", border: "1px solid rgba(0,229,255,0.2)", boxShadow: "0 0 40px rgba(0,229,255,0.1)" }}>
+            <div className="text-center">
+              <span className="text-3xl">🎤</span>
+              <h2 className="text-white font-black text-lg mt-2">닉네임을 입력하세요</h2>
+              <p className="text-white/35 text-sm mt-1">룸에서 사용할 이름을 정해주세요</p>
+            </div>
+            <div className="relative">
+              <input
+                ref={inputRef}
+                value={nicknameInput}
+                onChange={e => setNicknameInput(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter") handleNicknameSubmit(); }}
+                placeholder="예: 노래왕김씨"
+                maxLength={20}
+                className="w-full bg-white/5 text-white text-sm px-4 py-3 rounded-xl outline-none placeholder-white/20"
+                style={{ border: "1px solid rgba(0,229,255,0.3)" }}
+                onFocus={e => (e.currentTarget.style.borderColor = "rgba(0,229,255,0.6)")}
+                onBlur={e => (e.currentTarget.style.borderColor = "rgba(0,229,255,0.3)")}
+              />
+              <button
+                onClick={() => setNicknameInput(randomNickname())}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-lg leading-none hover:scale-110 transition-transform"
+                title="랜덤 닉네임"
+              >
+                🎲
+              </button>
+            </div>
+            <button
+              onClick={handleNicknameSubmit}
+              disabled={!nicknameInput.trim()}
+              className="w-full py-3 rounded-xl font-black text-sm tracking-wider transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
+              style={{ background: "rgba(0,229,255,0.12)", border: "1px solid rgba(0,229,255,0.4)", color: "#00E5FF" }}
+            >
+              입장하기
+            </button>
+          </div>
         </div>
       )}
     </div>

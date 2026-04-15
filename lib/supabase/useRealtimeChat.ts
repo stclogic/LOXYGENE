@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase, isSupabaseConfigured } from "./supabaseClient";
+import { getUserId, getUserNickname } from "@/lib/utils/userSession";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -20,25 +21,47 @@ export interface ChatMessage {
 
 export interface UseRealtimeChatReturn {
   messages: ChatMessage[];
-  sendMessage: (
-    roomId: string,
-    text: string,
-    type?: MessageType,
-    nickname?: string
-  ) => Promise<void>;
+  sendMessage: (content: string, type?: MessageType) => Promise<void>;
   subscribeToChat: (roomId: string) => void;
   unsubscribeFromChat: () => void;
   isConnected: boolean;
 }
 
-// ── Mock fallback store (used when Supabase is not configured) ─────────────────
+// ── Mock fallback seed (used when Supabase is not configured) ─────────────────
 
 const MOCK_SEED: ChatMessage[] = [
-  { id: "m0", roomId: "room-001", type: "system",       nickname: "system",  text: "방에 입장했습니다 🎤",       timestamp: new Date(Date.now() - 120000).toISOString() },
-  { id: "m1", roomId: "room-001", type: "chat",         nickname: "김민준",  text: "안녕하세요~~",               timestamp: new Date(Date.now() - 90000).toISOString()  },
-  { id: "m2", roomId: "room-001", type: "chat",         nickname: "이지현",  text: "오늘 노래 기대돼요!",         timestamp: new Date(Date.now() - 60000).toISOString()  },
-  { id: "m3", roomId: "room-001", type: "gift_bouquet", nickname: "박서준",  text: "박서준님이 꽃다발을 선물했습니다! 🌸", timestamp: new Date(Date.now() - 30000).toISOString() },
+  { id: "m0", roomId: "room-001", type: "system",       nickname: "system",  text: "방에 입장했습니다 🎤",                timestamp: new Date(Date.now() - 120000).toISOString() },
+  { id: "m1", roomId: "room-001", type: "chat",         nickname: "김민준",  text: "안녕하세요~~",                        timestamp: new Date(Date.now() - 90000).toISOString()  },
+  { id: "m2", roomId: "room-001", type: "chat",         nickname: "이지현",  text: "오늘 노래 기대돼요!",                  timestamp: new Date(Date.now() - 60000).toISOString()  },
+  { id: "m3", roomId: "room-001", type: "gift_bouquet", nickname: "박서준",  text: "박서준님이 꽃다발을 선물했습니다! 🌸", timestamp: new Date(Date.now() - 30000).toISOString()  },
 ];
+
+// ── Load recent messages from Supabase ────────────────────────────────────────
+
+async function loadRecentMessages(
+  roomId: string,
+  limit = 50
+): Promise<ChatMessage[]> {
+  if (!isSupabaseConfigured) return [];
+  const { data, error } = await supabase
+    .from("messages")
+    .select("*")
+    .eq("room_id", roomId)
+    .order("created_at", { ascending: true })
+    .limit(limit);
+
+  if (error || !data) return [];
+
+  return data.map((row: Record<string, unknown>) => ({
+    id: String(row.id ?? Date.now()),
+    roomId: String(row.room_id ?? roomId),
+    type: (row.type as MessageType) ?? "chat",
+    nickname: String(row.nickname ?? ""),
+    text: String(row.content ?? row.text ?? ""),
+    timestamp: String(row.created_at ?? new Date().toISOString()),
+    userId: row.user_id ? String(row.user_id) : undefined,
+  }));
+}
 
 // ── Hook ──────────────────────────────────────────────────────────────────────
 
@@ -58,7 +81,6 @@ export function useRealtimeChat(
     roomIdRef.current = roomId;
 
     if (!isSupabaseConfigured) {
-      // Mock mode: already seeded, just mark as "connected"
       setIsConnected(true);
       return;
     }
@@ -68,8 +90,13 @@ export function useRealtimeChat(
       supabase.removeChannel(channelRef.current);
     }
 
+    // Fetch recent history
+    loadRecentMessages(roomId).then(history => {
+      if (history.length > 0) setMessages(history);
+    });
+
     const channel = supabase
-      .channel(`chat:${roomId}`)
+      .channel(`room:${roomId}`)
       .on(
         "postgres_changes",
         {
@@ -85,7 +112,7 @@ export function useRealtimeChat(
             roomId: String(row.room_id ?? roomId),
             type: (row.type as MessageType) ?? "chat",
             nickname: String(row.nickname ?? ""),
-            text: String(row.text ?? ""),
+            text: String(row.content ?? row.text ?? ""),
             timestamp: String(row.created_at ?? new Date().toISOString()),
             userId: row.user_id ? String(row.user_id) : undefined,
           };
@@ -110,36 +137,32 @@ export function useRealtimeChat(
 
   // ── Send message ─────────────────────────────────────────────────────────
   const sendMessage = useCallback(
-    async (
-      roomId: string,
-      text: string,
-      type: MessageType = "chat",
-      nickname = "나"
-    ) => {
+    async (content: string, type: MessageType = "chat") => {
+      const roomId = roomIdRef.current;
+      const nickname = getUserNickname();
+      const userId = getUserId();
+
       const optimistic: ChatMessage = {
         id: `local-${Date.now()}`,
         roomId,
         type,
         nickname,
-        text,
+        text: content,
         timestamp: new Date().toISOString(),
+        userId,
       };
 
-      if (!isSupabaseConfigured) {
-        // Mock mode: add locally
-        addMessage(optimistic);
-        return;
-      }
-
-      // Optimistic insert
+      // Optimistic add
       addMessage(optimistic);
+
+      if (!isSupabaseConfigured) return;
 
       const { error } = await supabase.from("messages").insert({
         room_id: roomId,
-        type,
+        user_id: userId,
         nickname,
-        text,
-        created_at: optimistic.timestamp,
+        content,
+        type,
       });
 
       if (error) {

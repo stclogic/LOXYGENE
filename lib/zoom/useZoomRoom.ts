@@ -252,3 +252,122 @@ export function useZoomRoom(): UseZoomRoomReturn {
     toggleLocalVideo,
   };
 }
+
+// ── WebRTC fallback hook (no Zoom SDK required) ───────────────────────────────
+
+export interface WebRTCParticipant {
+  userId: string;
+  nickname: string;
+  isMicActive: boolean;
+  isCameraActive: boolean;
+  role: "host" | "guest" | "vip";
+}
+
+export interface UseWebRTCMediaReturn {
+  localStream: MediaStream | null;
+  participants: WebRTCParticipant[];
+  isHost: boolean;
+  isMicActive: boolean;
+  isCameraActive: boolean;
+  isSDKReady: boolean;
+  initLocalMedia: () => Promise<MediaStream | null>;
+  toggleMic: () => void;
+  toggleCamera: () => void;
+  muteParticipant: (userId: string) => void;
+  unmuteParticipant: (userId: string) => void;
+  muteAll: () => void;
+  transferHost: (userId: string) => void;
+  setIsHost: (v: boolean) => void;
+}
+
+export function useWebRTCMedia(): UseWebRTCMediaReturn {
+  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
+  const [participants, setParticipants] = useState<WebRTCParticipant[]>([]);
+  const [isHost, setIsHost] = useState(false);
+  const [isMicActive, setIsMicActive] = useState(false);
+  const [isCameraActive, setIsCameraActive] = useState(false);
+  const [isSDKReady, setIsSDKReady] = useState(false);
+
+  const streamRef = useRef<MediaStream | null>(null);
+
+  const initLocalMedia = useCallback(async (): Promise<MediaStream | null> => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { width: 1280, height: 720, facingMode: "user" },
+        audio: { echoCancellation: true, noiseSuppression: true },
+      });
+      streamRef.current = stream;
+      setLocalStream(stream);
+      setIsCameraActive(true);
+      setIsMicActive(true);
+      setIsSDKReady(true);
+      return stream;
+    } catch (err) {
+      console.warn("[useWebRTCMedia] Camera/mic not available:", err);
+      setIsSDKReady(true); // mark ready even without camera
+      return null;
+    }
+  }, []);
+
+  const toggleMic = useCallback(() => {
+    const stream = streamRef.current;
+    if (!stream) return;
+    stream.getAudioTracks().forEach(t => { t.enabled = !t.enabled; });
+    setIsMicActive(prev => !prev);
+  }, []);
+
+  const toggleCamera = useCallback(() => {
+    const stream = streamRef.current;
+    if (!stream) return;
+    stream.getVideoTracks().forEach(t => { t.enabled = !t.enabled; });
+    setIsCameraActive(prev => !prev);
+  }, []);
+
+  const muteParticipant = useCallback((userId: string) => {
+    setParticipants(prev =>
+      prev.map(p => p.userId === userId ? { ...p, isMicActive: false } : p)
+    );
+  }, []);
+
+  const unmuteParticipant = useCallback((userId: string) => {
+    setParticipants(prev =>
+      prev.map(p => p.userId === userId ? { ...p, isMicActive: true } : p)
+    );
+  }, []);
+
+  const muteAll = useCallback(() => {
+    setParticipants(prev => prev.map(p => ({ ...p, isMicActive: false })));
+  }, []);
+
+  const transferHost = useCallback((userId: string) => {
+    setParticipants(prev =>
+      prev.map(p => ({
+        ...p,
+        role: p.userId === userId ? "host" : p.role === "host" ? "guest" : p.role,
+      }))
+    );
+    setIsHost(false);
+  }, []);
+
+  // Cleanup on unmount
+  useEffect(() => () => {
+    streamRef.current?.getTracks().forEach(t => t.stop());
+  }, []);
+
+  return {
+    localStream,
+    participants,
+    isHost,
+    isMicActive,
+    isCameraActive,
+    isSDKReady,
+    initLocalMedia,
+    toggleMic,
+    toggleCamera,
+    muteParticipant,
+    unmuteParticipant,
+    muteAll,
+    transferHost,
+    setIsHost,
+  };
+}

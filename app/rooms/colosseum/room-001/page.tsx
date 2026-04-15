@@ -21,6 +21,7 @@ import AudienceReactions, { type AudienceReactionsHandle } from "@/components/ro
 // Hooks
 import { useBPMDetector } from "@/lib/audio/useBPMDetector";
 import { useVoiceScoring } from "@/lib/scoring/useVoiceScoring";
+import { hasNickname, getUserNickname, setUserNickname, randomNickname } from "@/lib/utils/userSession";
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 const SONG_TITLE = "안동역에서";
@@ -155,6 +156,21 @@ export default function ColosseumRoom001Page() {
 
   // Director
   const [directorOpen, setDirectorOpen] = useState(false);
+
+  // Nickname modal
+  const [nicknameModalOpen, setNicknameModalOpen] = useState(false);
+  const [nicknameInput, setNicknameInput] = useState("");
+
+  useEffect(() => {
+    if (!hasNickname()) setNicknameModalOpen(true);
+  }, []);
+
+  const handleNicknameSubmit = () => {
+    const name = nicknameInput.trim();
+    if (!name) return;
+    setUserNickname(name);
+    setNicknameModalOpen(false);
+  };
 
   const gifts = useRoomStore((s) => s.gifts);
 
@@ -778,6 +794,50 @@ export default function ColosseumRoom001Page() {
                 );
               })}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Nickname entry modal */}
+      {nicknameModalOpen && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center px-4"
+          style={{ background: "rgba(0,0,0,0.88)", backdropFilter: "blur(12px)" }}>
+          <div className="w-full max-w-sm rounded-2xl p-7 flex flex-col gap-5"
+            style={{ background: "rgba(10,10,10,0.99)", border: "1px solid rgba(0,229,255,0.2)", boxShadow: "0 0 40px rgba(0,229,255,0.1)" }}>
+            <div className="text-center">
+              <span className="text-3xl">🎤</span>
+              <h2 className="text-white font-black text-lg mt-2">닉네임을 입력하세요</h2>
+              <p className="text-white/35 text-sm mt-1">룸에서 사용할 이름을 정해주세요</p>
+            </div>
+            <div className="relative">
+              <input
+                value={nicknameInput}
+                onChange={e => setNicknameInput(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter") handleNicknameSubmit(); }}
+                placeholder="예: 노래왕김씨"
+                maxLength={20}
+                autoFocus
+                className="w-full bg-white/5 text-white text-sm px-4 py-3 rounded-xl outline-none placeholder-white/20"
+                style={{ border: "1px solid rgba(0,229,255,0.3)" }}
+                onFocus={e => (e.currentTarget.style.borderColor = "rgba(0,229,255,0.6)")}
+                onBlur={e => (e.currentTarget.style.borderColor = "rgba(0,229,255,0.3)")}
+              />
+              <button
+                onClick={() => setNicknameInput(randomNickname())}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-lg leading-none hover:scale-110 transition-transform"
+                title="랜덤 닉네임"
+              >
+                🎲
+              </button>
+            </div>
+            <button
+              onClick={handleNicknameSubmit}
+              disabled={!nicknameInput.trim()}
+              className="w-full py-3 rounded-xl font-black text-sm tracking-wider transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
+              style={{ background: "rgba(0,229,255,0.12)", border: "1px solid rgba(0,229,255,0.4)", color: "#00E5FF", boxShadow: nicknameInput.trim() ? "0 0 20px rgba(0,229,255,0.15)" : "none" }}
+            >
+              입장하기
+            </button>
           </div>
         </div>
       )}

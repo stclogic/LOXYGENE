@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Icon } from "@iconify/react";
+import { useLocalStream } from "@/components/room/ZoomVideoRoom";
 
 export interface RoomParticipant {
   id: string;
@@ -33,6 +34,63 @@ const avatarColor = (nick: string) => {
 
 interface PopupState { id: string; x: number; y: number }
 
+// ── Video thumbnail ───────────────────────────────────────────────────────────
+
+function VideoThumb({
+  stream,
+  nickname,
+  size = 40,
+}: {
+  stream: MediaStream | null | undefined;
+  nickname: string;
+  size?: number;
+}) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const color = avatarColor(nickname);
+
+  useEffect(() => {
+    if (videoRef.current && stream) {
+      videoRef.current.srcObject = stream;
+    }
+  }, [stream]);
+
+  if (stream) {
+    return (
+      <video
+        ref={videoRef}
+        autoPlay
+        muted
+        playsInline
+        style={{
+          width: size,
+          height: size,
+          borderRadius: "50%",
+          objectFit: "cover",
+          transform: "scaleX(-1)",
+        }}
+      />
+    );
+  }
+
+  // Avatar fallback
+  return (
+    <div
+      className="flex items-center justify-center text-sm font-bold flex-shrink-0"
+      style={{
+        width: size,
+        height: size,
+        borderRadius: "50%",
+        background: `${color}22`,
+        color,
+      }}
+    >
+      {nickname[0]}
+    </div>
+  );
+}
+
+// ── Main component ────────────────────────────────────────────────────────────
+
 export default function ParticipantRow({
   participants,
   activeSingerId,
@@ -43,6 +101,7 @@ export default function ParticipantRow({
   onTransferHost,
 }: ParticipantRowProps) {
   const [popup, setPopup] = useState<PopupState | null>(null);
+  const { localStream } = useLocalStream();
 
   const handleThumbClick = (e: React.MouseEvent, id: string) => {
     if (!isHost) return;
@@ -62,6 +121,12 @@ export default function ParticipantRow({
         const color = avatarColor(p.nickname);
         const isSelf = p.id === currentUserId;
 
+        // Which stream to show:
+        // - Local participant: use WebRTC localStream from context
+        // - VIP remote: use their videoStream prop if provided
+        // - Others: no video (avatar)
+        const streamToShow = isSelf ? localStream : (p.isVIP ? p.videoStream : null);
+
         return (
           <div
             key={p.id}
@@ -79,16 +144,17 @@ export default function ParticipantRow({
             onClick={e => handleThumbClick(e, p.id)}
             title={isHost ? "클릭하여 제어" : p.nickname}
           >
-            {/* Avatar */}
+            {/* Avatar / Video */}
             <div
-              className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0"
+              className="relative overflow-hidden flex-shrink-0"
               style={{
-                background: `${color}22`,
-                color,
-                border: `2px solid ${isActive ? color : p.isVIP ? "rgba(201,168,76,0.4)" : "rgba(255,255,255,0.1)"}`,
+                width: 40, height: 40,
+                borderRadius: "50%",
+                border: `2px solid ${isActive ? color : p.isVIP ? "rgba(201,168,76,0.7)" : "rgba(255,255,255,0.1)"}`,
+                boxShadow: p.isVIP ? "0 0 8px rgba(201,168,76,0.3)" : undefined,
               }}
             >
-              {p.nickname[0]}
+              <VideoThumb stream={streamToShow} nickname={p.nickname} size={40} />
             </div>
 
             {/* Nickname */}
@@ -96,11 +162,13 @@ export default function ParticipantRow({
               {p.nickname.slice(0, 5)}{isSelf ? " (나)" : ""}
             </span>
 
-            {/* VIP badge */}
+            {/* VIP badge — gold "V" top-right */}
             {p.isVIP && (
-              <span className="absolute top-0.5 right-0.5 text-[8px] leading-none px-0.5 py-0.5 rounded"
-                style={{ background: "rgba(201,168,76,0.2)", color: "#C9A84C", border: "1px solid rgba(201,168,76,0.4)" }}>
-                VIP
+              <span
+                className="absolute top-0.5 right-0.5 text-[8px] leading-none px-0.5 py-0.5 rounded font-black"
+                style={{ background: "rgba(201,168,76,0.2)", color: "#C9A84C", border: "1px solid rgba(201,168,76,0.4)" }}
+              >
+                V
               </span>
             )}
 

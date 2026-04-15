@@ -22,6 +22,7 @@ import AudienceReactions, { type AudienceReactionsHandle } from "@/components/ro
 import { useBPMDetector } from "@/lib/audio/useBPMDetector";
 import { useVoiceScoring } from "@/lib/scoring/useVoiceScoring";
 import { hasNickname, getUserNickname, setUserNickname, randomNickname } from "@/lib/utils/userSession";
+import { envConfig } from "@/lib/utils/envCheck";
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 const SONG_TITLE = "안동역에서";
@@ -32,6 +33,12 @@ const MY_NICKNAME = "여름밤";
 const TICKET_COST = 0; // 0 = free room
 
 // ── Types ──────────────────────────────────────────────────────────────────────
+interface SearchResult {
+  id: string;
+  title: string;
+  thumbnail?: string;
+}
+
 interface QueueItem {
   id: string;
   songTitle: string;
@@ -50,15 +57,12 @@ interface ChatMessage {
 }
 
 // ── Mock data ──────────────────────────────────────────────────────────────────
-const MOCK_SONGS = [
-  { id: "s1", title: "안동역에서",             artist: "진성"   },
-  { id: "s2", title: "사랑했나봐",             artist: "이창원" },
-  { id: "s3", title: "봄날",                   artist: "BTS"    },
-  { id: "s4", title: "밤편지",                 artist: "IU"     },
-  { id: "s5", title: "너를 위해",              artist: "임재범" },
-  { id: "s6", title: "사랑했지만",             artist: "김광석" },
-  { id: "s7", title: "첫눈처럼 너에게 가겠다", artist: "엑소"   },
-];
+// Song parsing helper: "제목 - 아티스트 (가라오케)" → { songTitle, artist }
+function parseSongTitle(raw: string): { songTitle: string; artist: string } {
+  const match = raw.match(/^(.+?)\s*[-–]\s*(.+?)(?:\s*\(.*?\))?\s*$/);
+  if (match) return { songTitle: match[1].trim(), artist: match[2].trim() };
+  return { songTitle: raw.replace(/\s*\(가라오케\)\s*$/i, "").trim(), artist: "" };
+}
 
 const INIT_PARTICIPANTS: RoomParticipant[] = [
   { id: "p1", nickname: "가을바람",   isMuted: true,  isCurrentSinger: false, isVIP: true  },
@@ -119,8 +123,11 @@ export default function ColosseumRoom001Page() {
   // Search
   const [searchQuery, setSearchQuery] = useState("");
   const [showResults, setShowResults] = useState(false);
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
   const [guestRequestOpen, setGuestRequestOpen] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Queue
   const [queue, setQueue] = useState<QueueItem[]>(INIT_QUEUE);
@@ -156,6 +163,9 @@ export default function ColosseumRoom001Page() {
 
   // Director
   const [directorOpen, setDirectorOpen] = useState(false);
+
+  // Demo mode banner
+  const [demoBannerDismissed, setDemoBannerDismissed] = useState(false);
 
   // Nickname modal
   const [nicknameModalOpen, setNicknameModalOpen] = useState(false);
@@ -222,11 +232,24 @@ export default function ColosseumRoom001Page() {
     toastTimerRef.current = setTimeout(() => setToast(null), 2200);
   };
 
-  const filteredSongs = searchQuery.length >= 2
-    ? MOCK_SONGS.filter(s =>
-        s.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        s.artist.toLowerCase().includes(searchQuery.toLowerCase()))
-    : [];
+  // ── Song search (debounced, hits /api/youtube-search) ─────────────────────
+  const searchSongs = (query: string) => {
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    if (query.length < 2) { setSearchResults([]); setShowResults(false); return; }
+    searchDebounceRef.current = setTimeout(async () => {
+      setIsSearching(true);
+      try {
+        const res = await fetch(`/api/youtube-search?q=${encodeURIComponent(query)}`);
+        const data = (await res.json()) as { items: SearchResult[]; isMock: boolean };
+        setSearchResults(data.items ?? []);
+        setShowResults(true);
+      } catch (err) {
+        console.error("[searchSongs]", err);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 300);
+  };
 
   // ── Handlers ──────────────────────────────────────────────────────────────
   const handlePlay = () => {
@@ -242,15 +265,17 @@ export default function ColosseumRoom001Page() {
     setChatInput("");
   };
 
-  const handleAddSong = (song: typeof MOCK_SONGS[0]) => {
-    setQueue(prev => [...prev, { id: `q-${Date.now()}`, songTitle: song.title, artist: song.artist, singerName: null, singerId: null, status: "waiting" }]);
-    setSearchQuery(""); setShowResults(false);
+  const handleAddSong = (song: SearchResult) => {
+    const { songTitle, artist } = parseSongTitle(song.title);
+    setQueue(prev => [...prev, { id: `q-${Date.now()}`, songTitle, artist, singerName: null, singerId: null, status: "waiting" }]);
+    setSearchQuery(""); setShowResults(false); setSearchResults([]);
     showToast("대기열에 추가되었습니다");
   };
 
-  const handleGuestRequest = (song: typeof MOCK_SONGS[0]) => {
-    setQueue(prev => [...prev, { id: `req-${Date.now()}`, songTitle: song.title, artist: song.artist, singerName: MY_NICKNAME, singerId: MY_ID, status: "waiting", pendingApproval: true }]);
-    setSearchQuery(""); setShowResults(false); setGuestRequestOpen(false);
+  const handleGuestRequest = (song: SearchResult) => {
+    const { songTitle, artist } = parseSongTitle(song.title);
+    setQueue(prev => [...prev, { id: `req-${Date.now()}`, songTitle, artist, singerName: MY_NICKNAME, singerId: MY_ID, status: "waiting", pendingApproval: true }]);
+    setSearchQuery(""); setShowResults(false); setSearchResults([]); setGuestRequestOpen(false);
     showToast("신청이 접수되었습니다");
   };
 
@@ -334,6 +359,17 @@ export default function ColosseumRoom001Page() {
 
       {/* Audience reactions overlay + quick buttons */}
       <AudienceReactions ref={reactionsRef} onReactionSent={handleReactionSent} />
+
+      {/* Demo mode banner (dev only, dismissible) */}
+      {process.env.NODE_ENV !== "production" && envConfig.isDemoMode() && !demoBannerDismissed && (
+        <div className="fixed top-0 inset-x-0 z-[55] flex items-center justify-center gap-2 px-4 py-1.5 text-xs"
+          style={{ background: "rgba(99,102,241,0.1)", borderBottom: "1px solid rgba(99,102,241,0.2)", backdropFilter: "blur(8px)" }}>
+          <span className="text-indigo-300/80">🔵 데모 모드 — 실제 서비스를 위해 Supabase와 Zoom SDK를 연결하세요</span>
+          <button onClick={() => setDemoBannerDismissed(true)} className="ml-2 text-white/30 hover:text-white/60 transition-colors">
+            ✕
+          </button>
+        </div>
+      )}
 
       {/* Fixed overlays */}
       <Link href="/"
@@ -542,28 +578,30 @@ export default function ColosseumRoom001Page() {
                     <div className="relative">
                       <Icon icon="solar:magnifier-linear" className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/25 pointer-events-none" />
                       <input value={searchQuery}
-                        onChange={e => { setSearchQuery(e.target.value); setShowResults(e.target.value.length >= 2); }}
-                        onFocus={() => { if (searchQuery.length >= 2) setShowResults(true); }}
+                        onChange={e => { setSearchQuery(e.target.value); searchSongs(e.target.value); }}
+                        onFocus={() => { if (searchResults.length > 0) setShowResults(true); }}
                         placeholder="가라오케 곡 검색..."
                         className="w-full pl-8 pr-7 py-1.5 rounded-lg bg-white/5 text-white/80 text-xs placeholder-white/20 outline-none"
                         style={{ border: "1px solid rgba(255,255,255,0.08)" }}
                         onFocusCapture={e => (e.currentTarget.style.borderColor = "rgba(0,229,255,0.4)")}
                         onBlur={e => (e.currentTarget.style.borderColor = "rgba(255,255,255,0.08)")} />
                       {searchQuery && (
-                        <button onClick={() => { setSearchQuery(""); setShowResults(false); }}
+                        <button onClick={() => { setSearchQuery(""); setShowResults(false); setSearchResults([]); }}
                           className="absolute right-2 top-1/2 -translate-y-1/2 text-white/25 hover:text-white/50">
                           <Icon icon="solar:close-circle-bold" className="w-3.5 h-3.5" />
                         </button>
                       )}
                     </div>
-                    {showResults && filteredSongs.length > 0 && (
+                    {(showResults || isSearching) && (
                       <div className="absolute top-[calc(100%+4px)] left-0 right-0 z-30 rounded-lg overflow-hidden"
                         style={{ background: "rgba(10,10,10,0.98)", border: "1px solid rgba(0,229,255,0.15)" }}>
-                        {filteredSongs.map(song => (
+                        {isSearching && (
+                          <div className="px-3 py-2 text-white/30 text-xs">검색 중...</div>
+                        )}
+                        {searchResults.map(song => (
                           <div key={song.id} className="flex items-center gap-2 px-3 py-2 hover:bg-white/5 transition-colors">
                             <div className="flex-1 min-w-0">
                               <p className="text-white/80 text-xs font-medium truncate">{song.title}</p>
-                              <p className="text-white/35 text-[10px]">{song.artist}</p>
                             </div>
                             <button onClick={() => handleAddSong(song)}
                               className="flex-shrink-0 px-2 py-0.5 rounded text-[11px] font-bold"
@@ -587,20 +625,22 @@ export default function ColosseumRoom001Page() {
                       <div className="flex flex-col gap-1.5">
                         <div className="relative">
                           <Icon icon="solar:magnifier-linear" className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/25 pointer-events-none" />
-                          <input value={searchQuery} onChange={e => { setSearchQuery(e.target.value); setShowResults(e.target.value.length >= 2); }}
+                          <input value={searchQuery} onChange={e => { setSearchQuery(e.target.value); searchSongs(e.target.value); }}
                             placeholder="노래 검색..."
                             className="w-full pl-8 pr-7 py-1.5 rounded-lg bg-white/5 text-white/80 text-xs placeholder-white/20 outline-none"
                             style={{ border: "1px solid rgba(255,255,255,0.08)" }}
                             onFocusCapture={e => (e.currentTarget.style.borderColor = "rgba(0,229,255,0.4)")}
                             onBlur={e => (e.currentTarget.style.borderColor = "rgba(255,255,255,0.08)")} />
                         </div>
-                        {showResults && filteredSongs.length > 0 && (
+                        {(showResults || isSearching) && (
                           <div className="rounded-lg overflow-hidden" style={{ border: "1px solid rgba(255,255,255,0.06)" }}>
-                            {filteredSongs.map(song => (
+                            {isSearching && (
+                              <div className="px-3 py-2 text-white/30 text-xs">검색 중...</div>
+                            )}
+                            {searchResults.map(song => (
                               <div key={song.id} className="flex items-center gap-2 px-2.5 py-2 hover:bg-white/5">
                                 <div className="flex-1 min-w-0">
                                   <p className="text-white/75 text-xs truncate">{song.title}</p>
-                                  <p className="text-white/35 text-[10px]">{song.artist}</p>
                                 </div>
                                 <button onClick={() => handleGuestRequest(song)}
                                   className="flex-shrink-0 px-2 py-0.5 rounded text-[11px] font-bold"

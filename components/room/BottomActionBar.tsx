@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Icon } from "@iconify/react";
 import { useRoomStore } from "@/lib/store/roomStore";
+import { useLocalStream } from "@/components/room/ZoomVideoRoom";
 
 interface GiftParticle {
   id: number;
@@ -12,10 +13,8 @@ interface GiftParticle {
 }
 
 export function BottomActionBar() {
-  const {
-    isMicOn, isCameraOn, toggleMic, toggleCamera,
-    isInQueue, queuePosition, joinQueue, leaveQueue, sendGift,
-  } = useRoomStore();
+  const { isInQueue, queuePosition, joinQueue, leaveQueue, sendGift } = useRoomStore();
+  const { isCameraActive, isMicActive, toggleMic, toggleCamera } = useLocalStream();
   const [particles, setParticles] = useState<GiftParticle[]>([]);
 
   const triggerGift = (type: "bouquet" | "champagne") => {
@@ -57,16 +56,16 @@ export function BottomActionBar() {
           onClick={toggleMic}
           className="flex flex-col items-center justify-center gap-1 min-w-[44px] min-h-[44px] rounded-xl px-2 py-2 transition-all duration-200 active:scale-95"
           style={{
-            background: isMicOn ? "rgba(0,229,255,0.15)" : "rgba(255,50,50,0.1)",
-            border: isMicOn ? "1px solid rgba(0,229,255,0.4)" : "1px solid rgba(255,50,50,0.3)",
+            background: isMicActive ? "rgba(0,229,255,0.15)" : "rgba(255,50,50,0.1)",
+            border: isMicActive ? "1px solid rgba(0,229,255,0.4)" : "1px solid rgba(255,50,50,0.3)",
           }}
         >
           <Icon
-            icon={isMicOn ? "solar:microphone-bold" : "solar:microphone-slash-bold"}
+            icon={isMicActive ? "solar:microphone-bold" : "solar:microphone-slash-bold"}
             className="text-xl lg:text-base w-6 h-6 lg:w-5 lg:h-5"
-            style={{ color: isMicOn ? "#00E5FF" : "#ff5555" }}
+            style={{ color: isMicActive ? "#00E5FF" : "#ff5555" }}
           />
-          <span className="text-[10px] leading-none lg:hidden" style={{ color: isMicOn ? "#00E5FF" : "#ff5555" }}>
+          <span className="text-[10px] leading-none lg:hidden" style={{ color: isMicActive ? "#00E5FF" : "#ff5555" }}>
             마이크
           </span>
         </button>
@@ -76,16 +75,16 @@ export function BottomActionBar() {
           onClick={toggleCamera}
           className="flex flex-col items-center justify-center gap-1 min-w-[44px] min-h-[44px] rounded-xl px-2 py-2 transition-all duration-200 active:scale-95"
           style={{
-            background: isCameraOn ? "rgba(0,229,255,0.15)" : "rgba(255,255,255,0.04)",
-            border: isCameraOn ? "1px solid rgba(0,229,255,0.4)" : "1px solid rgba(255,255,255,0.08)",
+            background: isCameraActive ? "rgba(0,229,255,0.15)" : "rgba(255,50,50,0.1)",
+            border: isCameraActive ? "1px solid rgba(0,229,255,0.4)" : "1px solid rgba(255,50,50,0.3)",
           }}
         >
           <Icon
-            icon={isCameraOn ? "solar:camera-bold" : "solar:camera-slash-bold"}
+            icon={isCameraActive ? "solar:camera-bold" : "solar:camera-slash-bold"}
             className="text-xl lg:text-base w-6 h-6 lg:w-5 lg:h-5"
-            style={{ color: isCameraOn ? "#00E5FF" : "rgba(255,255,255,0.4)" }}
+            style={{ color: isCameraActive ? "#00E5FF" : "#ff5555" }}
           />
-          <span className="text-[10px] leading-none text-white/50 lg:hidden">카메라</span>
+          <span className="text-[10px] leading-none lg:hidden" style={{ color: isCameraActive ? "#00E5FF" : "#ff5555" }}>카메라</span>
         </button>
       </div>
 

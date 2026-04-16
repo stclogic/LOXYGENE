@@ -101,7 +101,7 @@ export default function ParticipantRow({
   onTransferHost,
 }: ParticipantRowProps) {
   const [popup, setPopup] = useState<PopupState | null>(null);
-  const { localStream } = useLocalStream();
+  const { localStream, isCameraActive, isMicActive } = useLocalStream();
 
   const handleThumbClick = (e: React.MouseEvent, id: string) => {
     if (!isHost) return;
@@ -122,10 +122,16 @@ export default function ParticipantRow({
         const isSelf = p.id === currentUserId;
 
         // Which stream to show:
-        // - Local participant: use WebRTC localStream from context
+        // - Local participant + camera active: use WebRTC localStream from context
+        // - Local participant + camera off: null (show avatar + camera-slash overlay)
         // - VIP remote: use their videoStream prop if provided
         // - Others: no video (avatar)
-        const streamToShow = isSelf ? localStream : (p.isVIP ? p.videoStream : null);
+        const streamToShow = isSelf
+          ? (isCameraActive ? localStream : null)
+          : (p.isVIP ? p.videoStream : null);
+
+        // For local participant, use real track state; for others, use the prop
+        const isMutedIndicator = isSelf ? !isMicActive : p.isMuted;
 
         return (
           <div
@@ -155,6 +161,20 @@ export default function ParticipantRow({
               }}
             >
               <VideoThumb stream={streamToShow} nickname={p.nickname} size={40} />
+
+              {/* Camera-off overlay for local participant */}
+              {isSelf && !isCameraActive && (
+                <div
+                  className="absolute inset-0 flex items-center justify-center rounded-full"
+                  style={{ background: "rgba(0,0,0,0.55)" }}
+                >
+                  <Icon
+                    icon="solar:camera-slash-bold"
+                    className="w-3.5 h-3.5"
+                    style={{ color: "rgba(239,68,68,0.75)" }}
+                  />
+                </div>
+              )}
             </div>
 
             {/* Nickname */}
@@ -183,7 +203,7 @@ export default function ParticipantRow({
             )}
 
             {/* Muted slash */}
-            {p.isMuted && !isActive && (
+            {isMutedIndicator && !isActive && (
               <div className="absolute bottom-[18px] right-[2px]">
                 <Icon icon="solar:microphone-slash-bold" className="w-3 h-3" style={{ color: "rgba(239,68,68,0.8)" }} />
               </div>

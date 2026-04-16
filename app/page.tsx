@@ -6,6 +6,10 @@ import Link from "next/link";
 import { Icon } from "@iconify/react";
 import { LanguageProvider, useLanguage } from "@/lib/i18n/LanguageContext";
 import { LangCode, FLAGS, LANG_NAMES, T } from "@/lib/i18n/translations";
+import { useWallet } from "@/lib/hooks/useWallet";
+import dynamic from "next/dynamic";
+
+const ChargeModal = dynamic(() => import("@/components/ui/ChargeModal"), { ssr: false });
 
 // ── Mock data ─────────────────────────────────────────────────
 const MOCK_ROOMS = [
@@ -167,9 +171,10 @@ function ControlPanelBody() {
 
 // ── Hamburger menu ────────────────────────────────────────────
 function HamburgerMenu({
-  open, onClose, onSearchOpen,
+  open, onClose, onSearchOpen, onChargeOpen, walletBalance,
 }: {
   open: boolean; onClose: () => void; onSearchOpen: () => void;
+  onChargeOpen: () => void; walletBalance: number;
 }) {
   const { t, lang, setLang } = useLanguage();
   const router = useRouter();
@@ -222,10 +227,14 @@ function HamburgerMenu({
 
           {/* Wallet */}
           <div className="grid grid-cols-2 gap-2">
-            <div className="flex items-center gap-2 p-3 rounded-xl" style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)" }}>
+            <button
+              onClick={() => { onClose(); onChargeOpen(); }}
+              className="flex items-center gap-2 p-3 rounded-xl transition-all hover:border-[#00E5FF]/25"
+              style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)" }}
+            >
               <Icon icon="solar:wallet-linear" className="text-lg text-[#00E5FF]/70" />
-              <span className="text-xs font-medium text-white/90">24,500 <span className="text-white/40 font-light">O₂</span></span>
-            </div>
+              <span className="text-xs font-medium text-white/90 tabular-nums">{walletBalance.toLocaleString()} <span className="text-white/40 font-light">O₂</span></span>
+            </button>
             <div className="flex items-center gap-2 p-3 rounded-xl" style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)" }}>
               <Icon icon="solar:stars-linear" className="text-lg text-[#FF007F]/70" />
               <span className="text-xs font-medium text-white/90">12 <span className="text-white/40 font-light">BQ</span></span>
@@ -487,6 +496,10 @@ function Home() {
   const router = useRouter();
   const { t, fading } = useLanguage();
 
+  // Wallet
+  const { wallet, chargeCredits } = useWallet();
+  const [chargeModalOpen, setChargeModalOpen] = useState(false);
+
   // Header overlays
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -534,9 +547,9 @@ function Home() {
 
   // Prevent body scroll when menu is open
   useEffect(() => {
-    document.body.style.overflow = menuOpen || searchOpen || vvipScreen !== "closed" ? "hidden" : "";
+    document.body.style.overflow = menuOpen || searchOpen || vvipScreen !== "closed" || chargeModalOpen ? "hidden" : "";
     return () => { document.body.style.overflow = ""; };
-  }, [menuOpen, searchOpen, vvipScreen]);
+  }, [menuOpen, searchOpen, vvipScreen, chargeModalOpen]);
 
   const openVVIP = useCallback(() => {
     if (isVVIPMember) { codeInputRef.current?.focus(); return; }
@@ -647,9 +660,13 @@ function Home() {
 
           {/* Wallet + Bouquet — desktop */}
           <div className="hidden lg:flex items-center gap-4">
-            <button className="flex items-center gap-1.5 group hover:text-[#00E5FF] transition-colors min-h-[44px]">
+            <button
+              onClick={() => setChargeModalOpen(true)}
+              className="flex items-center gap-1.5 group hover:text-[#00E5FF] transition-colors min-h-[44px]"
+              title="O₂ 크레딧 충전"
+            >
               <Icon icon="solar:wallet-linear" className="text-lg text-[#00E5FF]/70 group-hover:text-[#00E5FF] transition-all" />
-              <span className="text-xs font-medium text-white/90">24,500 <span className="text-white/40 font-light">O₂</span></span>
+              <span className="text-xs font-medium text-white/90 tabular-nums">{wallet.balance.toLocaleString()} <span className="text-white/40 font-light">O₂</span></span>
             </button>
             <button className="flex items-center gap-1.5 group hover:text-[#FF007F] transition-colors min-h-[44px]">
               <Icon icon="solar:stars-linear" className="text-lg text-[#FF007F]/70 group-hover:text-[#FF007F] transition-all" />
@@ -708,7 +725,7 @@ function Home() {
       </header>
 
       {/* ── Hamburger menu overlay ── */}
-      <HamburgerMenu open={menuOpen} onClose={() => setMenuOpen(false)} onSearchOpen={() => setSearchOpen(true)} />
+      <HamburgerMenu open={menuOpen} onClose={() => setMenuOpen(false)} onSearchOpen={() => setSearchOpen(true)} onChargeOpen={() => setChargeModalOpen(true)} walletBalance={wallet.balance} />
 
       {/* ── Main layout (content fades on lang change) ── */}
       <div className="flex-1 flex overflow-hidden relative" style={{ opacity: fading ? 0 : 1, transition: "opacity 0.2s ease" }}>
@@ -1182,6 +1199,14 @@ function Home() {
         .form-input::placeholder { color: rgba(255,255,255,0.15); }
         .form-input:focus { border-color: rgba(201,168,76,0.35); background: rgba(201,168,76,0.02); }
       `}</style>
+
+      {/* Charge modal */}
+      <ChargeModal
+        open={chargeModalOpen}
+        currentBalance={wallet.balance}
+        onClose={() => setChargeModalOpen(false)}
+        onCharge={chargeCredits}
+      />
     </div>
   );
 }

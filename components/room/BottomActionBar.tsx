@@ -4,6 +4,10 @@ import { useState } from "react";
 import { Icon } from "@iconify/react";
 import { useRoomStore } from "@/lib/store/roomStore";
 import { useLocalStream } from "@/components/room/ZoomVideoRoom";
+import { useWallet } from "@/lib/hooks/useWallet";
+import dynamic from "next/dynamic";
+
+const ChargeModal = dynamic(() => import("@/components/ui/ChargeModal"), { ssr: false });
 
 interface GiftParticle {
   id: number;
@@ -12,24 +16,67 @@ interface GiftParticle {
   emoji: string;
 }
 
-export function BottomActionBar() {
-  const { isInQueue, queuePosition, joinQueue, leaveQueue, sendGift } = useRoomStore();
-  const { isCameraActive, isMicActive, toggleMic, toggleCamera } = useLocalStream();
-  const [particles, setParticles] = useState<GiftParticle[]>([]);
+interface BottomActionBarProps {
+  roomId?: string;
+  hostId?: string;
+  directorId?: string | null;
+}
 
-  const triggerGift = (type: "bouquet" | "champagne") => {
-    sendGift({ type, fromUser: "나", toUser: "별빛가수" });
+export function BottomActionBar({ roomId, hostId, directorId }: BottomActionBarProps) {
+  const { isInQueue, queuePosition, joinQueue, leaveQueue } = useRoomStore();
+  const { isCameraActive, isMicActive, toggleMic, toggleCamera } = useLocalStream();
+  const { wallet, sendGift, chargeCredits } = useWallet();
+  const [particles, setParticles] = useState<GiftParticle[]>([]);
+  const [toast, setToast] = useState<string | null>(null);
+  const [chargeModalOpen, setChargeModalOpen] = useState(false);
+
+  const BOUQUET_PRICE = 1000;
+  const CHAMPAGNE_PRICE = 3000;
+
+  const showToast = (msg: string) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), 2500);
+  };
+
+  const spawnParticles = (emoji: string) => {
     const newParticles: GiftParticle[] = Array.from({ length: 8 }, (_, i) => ({
       id: Date.now() + i,
       x: Math.random() * 100 - 50,
       y: Math.random() * -80 - 20,
-      emoji: type === "bouquet" ? "💐" : "🍾",
+      emoji,
     }));
-    setParticles((prev) => [...prev, ...newParticles]);
+    setParticles(prev => [...prev, ...newParticles]);
     setTimeout(() => {
-      setParticles((prev) => prev.filter((p) => !newParticles.find((n) => n.id === p.id)));
+      setParticles(prev => prev.filter(p => !newParticles.find(n => n.id === p.id)));
     }, 900);
   };
+
+  const handleGift = async (type: "bouquet" | "champagne") => {
+    const price = type === "bouquet" ? BOUQUET_PRICE : CHAMPAGNE_PRICE;
+
+    if (wallet.balance < price) {
+      showToast("크레딧이 부족합니다. 충전하세요");
+      setChargeModalOpen(true);
+      return;
+    }
+
+    spawnParticles(type === "bouquet" ? "💐" : "🍾");
+
+    const result = await sendGift(
+      hostId ?? "host",
+      directorId ?? null,
+      roomId ?? "room-001",
+      type,
+      1
+    );
+
+    if (!result.success) {
+      showToast(result.error ?? "선물 전송에 실패했습니다");
+    }
+  };
+
+  const insufficientBouquet = wallet.balance < BOUQUET_PRICE;
+  const insufficientChampagne = wallet.balance < CHAMPAGNE_PRICE;
 
   return (
     <div
@@ -47,6 +94,16 @@ export function BottomActionBar() {
           {p.emoji}
         </div>
       ))}
+
+      {/* Toast */}
+      {toast && (
+        <div
+          className="absolute -top-10 left-1/2 -translate-x-1/2 z-50 whitespace-nowrap px-3 py-1.5 rounded-lg text-xs font-medium pointer-events-none"
+          style={{ background: "rgba(12,12,12,0.95)", border: "1px solid rgba(255,80,80,0.3)", color: "#ff5555" }}
+        >
+          {toast}
+        </div>
+      )}
 
       {/* ── Left: Mic + Camera ── */}
       <div className="flex items-end gap-2">
@@ -115,22 +172,30 @@ export function BottomActionBar() {
 
         {/* Bouquet */}
         <button
-          onClick={() => triggerGift("bouquet")}
+          onClick={() => handleGift("bouquet")}
+          title={insufficientBouquet ? "크레딧이 부족합니다. 충전하세요" : "꽃다발 1,000 O₂"}
           className="flex flex-col items-center justify-center gap-1 min-w-[44px] min-h-[44px] rounded-xl px-2 py-2 transition-all duration-200 active:scale-95"
-          style={{ background: "rgba(255,0,127,0.12)", border: "1px solid rgba(255,0,127,0.35)" }}
+          style={{
+            background: insufficientBouquet ? "rgba(255,50,50,0.08)" : "rgba(255,0,127,0.12)",
+            border: insufficientBouquet ? "1px solid rgba(255,50,50,0.25)" : "1px solid rgba(255,0,127,0.35)",
+          }}
         >
           <span className="text-xl leading-none">💐</span>
-          <span className="text-[10px] leading-none text-[#FF007F]">꽃다발</span>
+          <span className="text-[10px] leading-none" style={{ color: insufficientBouquet ? "#ff5555" : "#FF007F" }}>꽃다발</span>
         </button>
 
         {/* Champagne */}
         <button
-          onClick={() => triggerGift("champagne")}
+          onClick={() => handleGift("champagne")}
+          title={insufficientChampagne ? "크레딧이 부족합니다. 충전하세요" : "샴페인 3,000 O₂"}
           className="flex flex-col items-center justify-center gap-1 min-w-[44px] min-h-[44px] rounded-xl px-2 py-2 transition-all duration-200 active:scale-95"
-          style={{ background: "rgba(255,215,0,0.08)", border: "1px solid rgba(255,215,0,0.25)" }}
+          style={{
+            background: insufficientChampagne ? "rgba(255,50,50,0.08)" : "rgba(255,215,0,0.08)",
+            border: insufficientChampagne ? "1px solid rgba(255,50,50,0.25)" : "1px solid rgba(255,215,0,0.25)",
+          }}
         >
           <span className="text-xl leading-none">🍾</span>
-          <span className="text-[10px] leading-none text-yellow-400/70">샴페인</span>
+          <span className="text-[10px] leading-none" style={{ color: insufficientChampagne ? "#ff5555" : "rgba(250,204,21,0.7)" }}>샴페인</span>
         </button>
 
         {/* F&B — hidden below 375px */}
@@ -142,6 +207,14 @@ export function BottomActionBar() {
           <span className="text-[10px] leading-none text-white/30 lg:hidden">F&amp;B</span>
         </button>
       </div>
+
+      {/* Charge modal — rendered in-place when needed from action bar */}
+      <ChargeModal
+        open={chargeModalOpen}
+        currentBalance={wallet.balance}
+        onClose={() => setChargeModalOpen(false)}
+        onCharge={chargeCredits}
+      />
     </div>
   );
 }

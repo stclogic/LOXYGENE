@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Outfit } from "next/font/google";
 import "./globals.css";
+import { Providers } from "./Providers";
 
 const outfit = Outfit({
   subsets: ["latin"],
@@ -32,7 +33,7 @@ export default function RootLayout({
   return (
     <html lang="ko" className={`${outfit.className} h-full`}>
       <body className="min-h-full bg-[#070707] text-white antialiased">
-        {children}
+        <Providers>{children}</Providers>
       </body>
     </html>
   );

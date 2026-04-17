@@ -7,6 +7,8 @@ import { Icon } from "@iconify/react";
 import { LanguageProvider, useLanguage } from "@/lib/i18n/LanguageContext";
 import { LangCode, FLAGS, LANG_NAMES, T } from "@/lib/i18n/translations";
 import { useWallet } from "@/lib/hooks/useWallet";
+import { useSettings } from "@/lib/context/SettingsContext";
+import { getUserNickname, setUserNickname, getUserMembership } from "@/lib/utils/userSession";
 import dynamic from "next/dynamic";
 
 const ChargeModal = dynamic(() => import("@/components/ui/ChargeModal"), { ssr: false });
@@ -176,8 +178,16 @@ function HamburgerMenu({
   open: boolean; onClose: () => void; onSearchOpen: () => void;
   onChargeOpen: () => void; walletBalance: number;
 }) {
-  const { t, lang, setLang } = useLanguage();
+  const { t } = useLanguage();
   const router = useRouter();
+  const [displayNick, setDisplayNick] = useState("...");
+  const [membership, setMembership] = useState<"free" | "vip" | "black">("free");
+
+  useEffect(() => {
+    if (!open) return;
+    setDisplayNick(getUserNickname());
+    setMembership(getUserMembership());
+  }, [open]);
 
   const navigate = (href: string) => { onClose(); router.push(href); };
 
@@ -248,27 +258,31 @@ function HamburgerMenu({
               <img alt="Profile" className="w-full h-full object-cover"
                 src="https://blogger.googleusercontent.com/img/a/AVvXsEh8T2CGGbCPmxEBGwiq2v-luepjn0bvKXYnpLLMOI9Rvh8XtVXD-ela3NDn9kNbUiDdQURDhafZDywL3qtFsx9UWYG-UEN_qDUgIjdXW1tcItXYIsa3NaxAdg4d9IBU-ffGusPR04wAuvxhNPNJ5Gr0MMHLHxH-chB8z_is36bhvHZhVBDPguHXAs_QEI8?img=32" />
             </div>
-            <div>
-              <p className="text-sm font-medium text-white/90">{t.header.profile}</p>
-              <p className="text-[10px] text-[#00E5FF]/70">{t.header.level}</p>
+            <div className="flex flex-col gap-1 min-w-0">
+              <p className="text-sm font-medium text-white/90 truncate">{displayNick}</p>
+              <span
+                className="text-[9px] font-bold px-1.5 py-0.5 rounded self-start tracking-wider"
+                style={
+                  membership === "black"
+                    ? { background: "rgba(201,168,76,0.12)", border: "1px solid rgba(201,168,76,0.4)", color: "#C9A84C" }
+                    : membership === "vip"
+                    ? { background: "rgba(0,229,255,0.08)", border: "1px solid rgba(0,229,255,0.3)", color: "#00E5FF" }
+                    : { background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.35)" }
+                }
+              >
+                {membership === "black" ? "BLACK" : membership === "vip" ? "VIP" : "FREE"}
+              </span>
             </div>
           </div>
 
-          {/* Language */}
-          <div className="grid grid-cols-4 gap-2">
-            {LANGS.map((l) => (
-              <button key={l} onClick={() => { setLang(l); }}
-                className="flex flex-col items-center gap-1 py-2.5 rounded-xl text-xs transition-all active:scale-95"
-                style={
-                  lang === l
-                    ? { background: "rgba(0,229,255,0.1)", border: "1px solid rgba(0,229,255,0.4)", color: "#00E5FF" }
-                    : { background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.4)" }
-                }>
-                <span className="text-base leading-none">{FLAGS[l]}</span>
-                <span className="text-[9px]">{l}</span>
-              </button>
-            ))}
-          </div>
+          {/* Wallet charge */}
+          <button
+            onClick={() => { onClose(); onChargeOpen(); }}
+            className="w-full py-2.5 rounded-xl text-xs font-bold transition-all active:scale-95"
+            style={{ background: "rgba(0,229,255,0.07)", border: "1px solid rgba(0,229,255,0.28)", color: "#00E5FF" }}
+          >
+            💎 {walletBalance.toLocaleString()} O₂ · 잔액 충전
+          </button>
 
           {/* Search shortcut */}
           <button onClick={() => { onClose(); onSearchOpen(); }}
@@ -454,39 +468,323 @@ function SearchModal({ open, onClose }: { open: boolean; onClose: () => void }) 
   );
 }
 
-// ── Language Picker (desktop dropdown) ────────────────────────
-function LangPicker() {
+// ── Toggle switch ─────────────────────────────────────────────
+function Toggle({
+  checked,
+  onChange,
+  disabled = false,
+}: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      onClick={() => !disabled && onChange(!checked)}
+      className="relative flex-shrink-0 w-9 h-5 rounded-full transition-all duration-200"
+      style={{
+        background: checked
+          ? disabled ? "rgba(0,229,255,0.35)" : "#00E5FF"
+          : "rgba(255,255,255,0.1)",
+        opacity: disabled ? 0.55 : 1,
+        cursor: disabled ? "not-allowed" : "pointer",
+        boxShadow: checked && !disabled ? "0 0 8px rgba(0,229,255,0.3)" : "none",
+      }}
+    >
+      <span
+        className="absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-all duration-200"
+        style={{ left: checked ? "calc(100% - 18px)" : "2px" }}
+      />
+    </button>
+  );
+}
+
+// ── Settings row ──────────────────────────────────────────────
+function SettingRow({
+  icon,
+  label,
+  note,
+  control,
+}: {
+  icon: string;
+  label: string;
+  note?: string;
+  control: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <div className="flex items-center gap-2 min-w-0">
+        <span className="text-sm flex-shrink-0">{icon}</span>
+        <span className="text-xs text-white/55">{label}</span>
+        {note && <span className="text-[9px] text-white/20 truncate">{note}</span>}
+      </div>
+      <div className="flex-shrink-0">{control}</div>
+    </div>
+  );
+}
+
+// ── Profile Dropdown ──────────────────────────────────────────
+function ProfileDropdown({
+  open,
+  onClose,
+  walletBalance,
+  onChargeOpen,
+  isVVIPMember,
+  isVVIPApplied,
+  onOpenVVIP,
+}: {
+  open: boolean;
+  onClose: () => void;
+  walletBalance: number;
+  onChargeOpen: () => void;
+  isVVIPMember: boolean;
+  isVVIPApplied: boolean;
+  onOpenVVIP: () => void;
+}) {
   const { lang, setLang } = useLanguage();
-  const [open, setOpen] = useState(false);
+  const { screenEffects, soundEffects, notifications, setScreenEffects, setSoundEffects, setNotifications } = useSettings();
+  const router = useRouter();
+
+  const [editingNick, setEditingNick] = useState(false);
+  const [nickInput, setNickInput] = useState("");
+  const [displayNick, setDisplayNick] = useState("...");
+  const [membership, setMembership] = useState<"free" | "vip" | "black">("free");
+  const nickInputRef = useRef<HTMLInputElement>(null);
+
+  // Read profile data whenever dropdown opens
+  useEffect(() => {
+    if (!open) return;
+    const nick = getUserNickname();
+    setDisplayNick(nick);
+    setNickInput(nick);
+    setMembership(getUserMembership());
+  }, [open]);
+
+  useEffect(() => {
+    if (editingNick) nickInputRef.current?.focus();
+  }, [editingNick]);
+
+  const saveNickname = () => {
+    const trimmed = nickInput.trim();
+    if (trimmed) {
+      setUserNickname(trimmed);
+      setDisplayNick(trimmed);
+    }
+    setEditingNick(false);
+  };
+
+  const handleLogout = () => {
+    try { localStorage.clear(); } catch {}
+    window.location.reload();
+  };
+
+  const badge =
+    membership === "black"
+      ? { bg: "rgba(201,168,76,0.12)", border: "1px solid rgba(201,168,76,0.4)", color: "#C9A84C", label: "BLACK" }
+      : membership === "vip"
+      ? { bg: "rgba(0,229,255,0.08)", border: "1px solid rgba(0,229,255,0.3)", color: "#00E5FF", label: "VIP" }
+      : { bg: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.35)", label: "FREE" };
+
+  if (!open) return null;
 
   return (
-    <div className="relative hidden lg:block">
-      {open && <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />}
-      <button onClick={() => setOpen(!open)}
-        className="relative z-40 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all hover:border-white/20"
-        style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.7)", minWidth: "44px", minHeight: "44px" }}>
-        <span>{FLAGS[lang]}</span>
-        <span className="font-mono">{lang}</span>
-        <Icon icon="solar:alt-arrow-down-linear" className="w-3 h-3 opacity-50" />
-      </button>
-      {open && (
-        <div className="absolute right-0 top-full mt-1 z-50 flex flex-col gap-1 p-1.5 rounded-xl min-w-[140px]"
-          style={{ background: "rgba(8,8,10,0.98)", border: "1px solid rgba(255,255,255,0.1)", backdropFilter: "blur(20px)", boxShadow: "0 8px 32px rgba(0,0,0,0.6)" }}>
-          {LANGS.map((l) => (
-            <button key={l} onClick={() => { setLang(l); setOpen(false); }}
-              className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs transition-all"
-              style={
-                lang === l
-                  ? { background: "rgba(0,229,255,0.1)", color: "#00E5FF" }
-                  : { color: "rgba(255,255,255,0.6)" }
-              }>
-              <span className="text-base">{FLAGS[l]}</span>
-              <span>{LANG_NAMES[l]}</span>
-              {lang === l && <Icon icon="solar:check-bold" className="w-3 h-3 ml-auto" />}
-            </button>
-          ))}
+    <div
+      className="absolute top-full right-0 mt-2 z-50 flex flex-col overflow-hidden"
+      style={{
+        width: 296,
+        maxWidth: "calc(100vw - 16px)",
+        background: "rgba(8,8,10,0.97)",
+        border: "1px solid rgba(255,255,255,0.1)",
+        borderRadius: 16,
+        boxShadow: "0 8px 40px rgba(0,0,0,0.7), 0 0 0 0.5px rgba(255,255,255,0.04)",
+        backdropFilter: "blur(28px)",
+        WebkitBackdropFilter: "blur(28px)",
+        animation: "dropdown-in 180ms ease forwards",
+      }}
+    >
+      <div className="overflow-y-auto hide-scrollbar" style={{ maxHeight: "min(560px, 85dvh)" }}>
+
+        {/* ── §1 Profile ── */}
+        <div className="p-4 flex items-start gap-3">
+          <div className="relative flex-shrink-0">
+            <div className="w-12 h-12 rounded-full overflow-hidden border border-white/15">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                alt="Avatar"
+                className="w-full h-full object-cover"
+                src="https://blogger.googleusercontent.com/img/a/AVvXsEh8T2CGGbCPmxEBGwiq2v-luepjn0bvKXYnpLLMOI9Rvh8XtVXD-ela3NDn9kNbUiDdQURDhafZDywL3qtFsx9UWYG-UEN_qDUgIjdXW1tcItXYIsa3NaxAdg4d9IBU-ffGusPR04wAuvxhNPNJ5Gr0MMHLHxH-chB8z_is36bhvHZhVBDPguHXAs_QEI8?img=32"
+              />
+            </div>
+            {/* Online dot */}
+            <div
+              className="absolute bottom-0 right-0 w-3 h-3 rounded-full border-2"
+              style={{ background: "#4ade80", borderColor: "rgb(8,8,10)" }}
+            />
+          </div>
+          <div className="flex flex-col gap-1.5 min-w-0 flex-1">
+            {/* Nickname row */}
+            <div className="flex items-center gap-1.5">
+              {editingNick ? (
+                <input
+                  ref={nickInputRef}
+                  value={nickInput}
+                  onChange={(e) => setNickInput(e.target.value)}
+                  onBlur={saveNickname}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") saveNickname();
+                    if (e.key === "Escape") { setEditingNick(false); }
+                  }}
+                  className="text-sm font-medium text-white bg-transparent border-b outline-none flex-1 pb-0.5 min-w-0"
+                  style={{ borderColor: "rgba(0,229,255,0.5)", caretColor: "#00E5FF" }}
+                  maxLength={20}
+                />
+              ) : (
+                <span className="text-sm font-medium text-white/90 truncate flex-1">{displayNick}</span>
+              )}
+              <button
+                onClick={() => setEditingNick((v) => !v)}
+                className="flex-shrink-0 w-5 h-5 flex items-center justify-center rounded transition-colors hover:text-[#00E5FF]"
+                style={{ color: "rgba(255,255,255,0.22)" }}
+                title="닉네임 변경"
+              >
+                <Icon icon="solar:pen-2-linear" className="w-3 h-3" />
+              </button>
+            </div>
+            {/* Membership badge */}
+            <span
+              className="text-[9px] font-bold px-1.5 py-0.5 rounded self-start tracking-wider"
+              style={{ background: badge.bg, border: badge.border, color: badge.color }}
+            >
+              {badge.label}
+            </span>
+          </div>
         </div>
-      )}
+
+        {/* ── §2 Wallet ── */}
+        <div className="px-4 pb-3 flex flex-col gap-2">
+          <div className="flex items-center justify-between">
+            <span className="text-lg font-black tabular-nums" style={{ color: "#00E5FF" }}>
+              💎 {walletBalance.toLocaleString()}
+              <span className="text-xs font-medium ml-1" style={{ color: "rgba(0,229,255,0.55)" }}>O₂</span>
+            </span>
+            <span className="text-xs font-medium" style={{ color: "rgba(255,0,127,0.75)" }}>⭐ 12 BQ</span>
+          </div>
+          <button
+            onClick={() => { onClose(); onChargeOpen(); }}
+            className="w-full py-2 rounded-lg text-xs font-bold transition-all hover:scale-[1.02] active:scale-[0.98]"
+            style={{ background: "rgba(0,229,255,0.07)", border: "1px solid rgba(0,229,255,0.28)", color: "#00E5FF" }}
+          >
+            잔액 충전
+          </button>
+        </div>
+
+        <div className="h-px mx-4" style={{ background: "rgba(255,255,255,0.06)" }} />
+
+        {/* ── §4 Settings ── */}
+        <div className="px-4 py-3 flex flex-col gap-3.5">
+
+          {/* Language */}
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <span className="text-sm">🌐</span>
+              <span className="text-xs text-white/55">언어</span>
+            </div>
+            <div className="flex items-center gap-1">
+              {LANGS.map((l) => (
+                <button
+                  key={l}
+                  onClick={() => setLang(l)}
+                  className="w-8 h-7 flex items-center justify-center rounded-lg text-sm transition-all"
+                  style={
+                    lang === l
+                      ? { background: "rgba(0,229,255,0.12)", border: "1px solid rgba(0,229,255,0.4)" }
+                      : { background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }
+                  }
+                  title={LANG_NAMES[l]}
+                >
+                  {FLAGS[l]}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <SettingRow icon="🔔" label="알림" control={<Toggle checked={notifications} onChange={setNotifications} />} />
+          <SettingRow icon="🔊" label="사운드" control={<Toggle checked={soundEffects} onChange={setSoundEffects} />} />
+          <SettingRow icon="✨" label="화면 효과" control={<Toggle checked={screenEffects} onChange={setScreenEffects} />} />
+          <SettingRow
+            icon="🌙"
+            label="다크모드"
+            note="항상 다크모드"
+            control={<Toggle checked disabled onChange={() => {}} />}
+          />
+        </div>
+
+        <div className="h-px mx-4" style={{ background: "rgba(255,255,255,0.06)" }} />
+
+        {/* ── §6 My Activity ── */}
+        <div className="px-2 py-1.5 flex flex-col">
+          <button
+            onClick={() => { onClose(); router.push("/admin"); }}
+            className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs text-white/55 hover:bg-white/[0.04] hover:text-white/85 transition-all text-left"
+          >
+            <span className="text-sm">📊</span>
+            내 활동 통계
+            <Icon icon="solar:arrow-right-linear" className="w-3 h-3 ml-auto opacity-25" />
+          </button>
+          <button
+            className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs text-white/55 hover:bg-white/[0.04] hover:text-white/85 transition-all text-left"
+          >
+            <span className="text-sm">💸</span>
+            수익 출금
+            <Icon icon="solar:arrow-right-linear" className="w-3 h-3 ml-auto opacity-25" />
+          </button>
+        </div>
+
+        <div className="h-px mx-4" style={{ background: "rgba(255,255,255,0.06)" }} />
+
+        {/* ── §8 VVIP ── */}
+        <div className="px-4 py-3">
+          {isVVIPMember ? (
+            <div className="flex items-center gap-2 text-xs font-medium py-1" style={{ color: "#C9A84C" }}>
+              🖤 Black 멤버 ✓
+            </div>
+          ) : isVVIPApplied ? (
+            <div className="flex items-center gap-2 text-xs py-1" style={{ color: "rgba(201,168,76,0.5)" }}>
+              🖤 심사중...
+            </div>
+          ) : (
+            <button
+              onClick={() => { onClose(); onOpenVVIP(); }}
+              className="w-full py-2.5 rounded-xl text-xs font-bold transition-all hover:scale-[1.02] active:scale-[0.98]"
+              style={{ background: "rgba(201,168,76,0.06)", border: "1px solid rgba(201,168,76,0.28)", color: "#C9A84C" }}
+            >
+              🖤 Black 멤버십 신청
+            </button>
+          )}
+        </div>
+
+        <div className="h-px mx-4" style={{ background: "rgba(255,255,255,0.06)" }} />
+
+        {/* ── §10 Bottom actions ── */}
+        <div className="px-2 py-1.5 flex flex-col">
+          <a
+            href="mailto:support@loxygene.com"
+            className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs text-white/50 hover:bg-white/[0.04] hover:text-white/80 transition-all"
+          >
+            <span className="text-sm">💬</span>
+            고객센터
+          </a>
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs hover:bg-red-500/10 transition-all text-left"
+            style={{ color: "rgba(239,68,68,0.65)" }}
+          >
+            <span className="text-sm">🚪</span>
+            로그아웃
+          </button>
+        </div>
+
+      </div>
     </div>
   );
 }
@@ -503,6 +801,8 @@ function Home() {
   // Header overlays
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const profileRef = useRef<HTMLDivElement>(null);
 
   // VVIP state
   const [accessCode, setAccessCode] = useState("");
@@ -539,6 +839,7 @@ function Home() {
         setMenuOpen(false);
         setSearchOpen(false);
         setVvipScreen("closed");
+        setProfileOpen(false);
       }
     };
     window.addEventListener("keydown", handler);
@@ -547,9 +848,21 @@ function Home() {
 
   // Prevent body scroll when menu is open
   useEffect(() => {
-    document.body.style.overflow = menuOpen || searchOpen || vvipScreen !== "closed" || chargeModalOpen ? "hidden" : "";
+    document.body.style.overflow = menuOpen || searchOpen || vvipScreen !== "closed" || chargeModalOpen || profileOpen ? "hidden" : "";
     return () => { document.body.style.overflow = ""; };
-  }, [menuOpen, searchOpen, vvipScreen, chargeModalOpen]);
+  }, [menuOpen, searchOpen, vvipScreen, chargeModalOpen, profileOpen]);
+
+  // Close profile dropdown on outside click
+  useEffect(() => {
+    if (!profileOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (profileRef.current && !profileRef.current.contains(e.target as Node)) {
+        setProfileOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [profileOpen]);
 
   const openVVIP = useCallback(() => {
     if (isVVIPMember) { codeInputRef.current?.focus(); return; }
@@ -655,33 +968,32 @@ function Home() {
             <Icon icon="solar:bag-3-linear" className="w-4.5 h-4.5 text-white/60 group-hover:text-[#00E5FF] transition-colors" />
           </Link>
 
-          {/* Language picker — desktop */}
-          <LangPicker />
-
-          {/* Wallet + Bouquet — desktop */}
-          <div className="hidden lg:flex items-center gap-4">
+          {/* Profile avatar + dropdown — desktop */}
+          <div className="relative hidden lg:block" ref={profileRef}>
             <button
-              onClick={() => setChargeModalOpen(true)}
-              className="flex items-center gap-1.5 group hover:text-[#00E5FF] transition-colors min-h-[44px]"
-              title="O₂ 크레딧 충전"
+              onClick={() => setProfileOpen((v) => !v)}
+              className="w-11 h-11 rounded-full border overflow-hidden relative group flex-shrink-0 transition-all"
+              style={{
+                borderColor: profileOpen ? "rgba(0,229,255,0.6)" : "rgba(255,255,255,0.1)",
+                boxShadow: profileOpen ? "0 0 12px rgba(0,229,255,0.35)" : "none",
+              }}
+              aria-label="프로필 메뉴"
             >
-              <Icon icon="solar:wallet-linear" className="text-lg text-[#00E5FF]/70 group-hover:text-[#00E5FF] transition-all" />
-              <span className="text-xs font-medium text-white/90 tabular-nums">{wallet.balance.toLocaleString()} <span className="text-white/40 font-light">O₂</span></span>
+              <div className="absolute inset-0 bg-gradient-to-tr from-[#00E5FF]/20 to-[#FF007F]/20 opacity-0 group-hover:opacity-100 transition-opacity" />
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img alt="Profile" className="w-full h-full object-cover mix-blend-luminosity opacity-80 group-hover:opacity-100 group-hover:mix-blend-normal transition-all"
+                src="https://blogger.googleusercontent.com/img/a/AVvXsEh8T2CGGbCPmxEBGwiq2v-luepjn0bvKXYnpLLMOI9Rvh8XtVXD-ela3NDn9kNbUiDdQURDhafZDywL3qtFsx9UWYG-UEN_qDUgIjdXW1tcItXYIsa3NaxAdg4d9IBU-ffGusPR04wAuvxhNPNJ5Gr0MMHLHxH-chB8z_is36bhvHZhVBDPguHXAs_QEI8?img=32" />
             </button>
-            <button className="flex items-center gap-1.5 group hover:text-[#FF007F] transition-colors min-h-[44px]">
-              <Icon icon="solar:stars-linear" className="text-lg text-[#FF007F]/70 group-hover:text-[#FF007F] transition-all" />
-              <span className="text-xs font-medium text-white/90">12 <span className="text-white/40 font-light">BQ</span></span>
-            </button>
+            <ProfileDropdown
+              open={profileOpen}
+              onClose={() => setProfileOpen(false)}
+              walletBalance={wallet.balance}
+              onChargeOpen={() => setChargeModalOpen(true)}
+              isVVIPMember={isVVIPMember}
+              isVVIPApplied={isVVIPApplied}
+              onOpenVVIP={openVVIP}
+            />
           </div>
-
-          {/* Divider + avatar — desktop */}
-          <div className="w-[1px] h-4 bg-white/10 hidden lg:block" />
-          <button className="w-11 h-11 rounded-full border border-white/10 overflow-hidden relative group hover:border-[#00E5FF] hover:shadow-[0_0_10px_rgba(0,229,255,0.3)] transition-all hidden lg:block flex-shrink-0">
-            <div className="absolute inset-0 bg-gradient-to-tr from-[#00E5FF]/20 to-[#FF007F]/20 opacity-0 group-hover:opacity-100 transition-opacity" />
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img alt="Profile" className="w-full h-full object-cover mix-blend-luminosity opacity-80 group-hover:opacity-100 group-hover:mix-blend-normal transition-all"
-              src="https://blogger.googleusercontent.com/img/a/AVvXsEh8T2CGGbCPmxEBGwiq2v-luepjn0bvKXYnpLLMOI9Rvh8XtVXD-ela3NDn9kNbUiDdQURDhafZDywL3qtFsx9UWYG-UEN_qDUgIjdXW1tcItXYIsa3NaxAdg4d9IBU-ffGusPR04wAuvxhNPNJ5Gr0MMHLHxH-chB8z_is36bhvHZhVBDPguHXAs_QEI8?img=32" />
-          </button>
 
           {/* Hamburger — mobile only */}
           <button
@@ -1164,6 +1476,10 @@ function Home() {
       )}
 
       <style>{`
+        @keyframes dropdown-in {
+          0%   { opacity: 0; transform: translateY(-6px) scale(0.97); }
+          100% { opacity: 1; transform: translateY(0) scale(1); }
+        }
         @keyframes gold-drift-sm {
           0% { transform: translateY(0px) translateX(0px); opacity: 0; }
           10% { opacity: 0.8; }

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useLocalStream } from "@/components/room/ZoomVideoRoom";
+import { useSettings } from "@/lib/context/SettingsContext";
 
 interface ReactiveBackgroundProps {
   beatDetected?: boolean;
@@ -25,6 +26,8 @@ export default function ReactiveBackground({
   const [rings, setRings] = useState<Ring[]>([]);
   const ringIdRef = useRef(0);
   const prevGiftRef = useRef<typeof lastGiftType>(null);
+
+  const { screenEffects } = useSettings();
 
   // Audio analysis from local stream
   const { localStream } = useLocalStream();
@@ -143,6 +146,8 @@ export default function ReactiveBackground({
     : baseBlobOpacity;
   const glowBlur = localStream ? 80 + intensity * 20 : 80;
   const blobScale = localStream ? 1 + intensity * 0.08 : 1;
+
+  if (!screenEffects) return null;
 
   return (
     <div className="fixed inset-0 pointer-events-none overflow-hidden" style={{ zIndex: 1 }}>

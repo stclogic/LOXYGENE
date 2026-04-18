@@ -177,9 +177,9 @@ function ControlPanelBody() {
             </div>
             <span className="text-xs font-medium text-white">x3</span>
           </div>
-          <button className="mt-2 w-full py-2 bg-white/5 hover:bg-white/10 text-[10px] font-medium tracking-widest uppercase text-white/80 rounded transition-colors border border-white/5">
+          <Link href="/payments/charge" className="mt-2 w-full py-2 bg-white/5 hover:bg-white/10 text-[10px] font-medium tracking-widest uppercase text-white/80 rounded transition-colors border border-white/5 block text-center">
             {t.sidebar.recharge}
-          </button>
+          </Link>
         </div>
       </div>
     </div>
@@ -684,13 +684,14 @@ function ProfileDropdown({
             </span>
             <span className="text-xs font-medium" style={{ color: "rgba(255,0,127,0.75)" }}>⭐ 12 BQ</span>
           </div>
-          <button
-            onClick={() => { onClose(); onChargeOpen(); }}
-            className="w-full py-2 rounded-lg text-xs font-bold transition-all hover:scale-[1.02] active:scale-[0.98]"
+          <Link
+            href="/payments/charge"
+            onClick={onClose}
+            className="w-full py-2 rounded-lg text-xs font-bold transition-all hover:scale-[1.02] active:scale-[0.98] block text-center"
             style={{ background: "rgba(0,229,255,0.07)", border: "1px solid rgba(0,229,255,0.28)", color: "#00E5FF" }}
           >
             잔액 충전
-          </button>
+          </Link>
         </div>
 
         <div className="h-px mx-4" style={{ background: "rgba(255,255,255,0.06)" }} />

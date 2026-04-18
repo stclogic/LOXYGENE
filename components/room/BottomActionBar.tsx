@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { Icon } from "@iconify/react";
 import { useRoomStore } from "@/lib/store/roomStore";
 import { useLocalStream } from "@/components/room/ZoomVideoRoom";
@@ -206,6 +207,17 @@ export function BottomActionBar({ roomId, hostId, directorId }: BottomActionBarP
           <Icon icon="solar:wine-glass-bold" className="text-xl lg:text-base w-6 h-6 lg:w-5 lg:h-5 text-white/40" />
           <span className="text-[10px] leading-none text-white/30 lg:hidden">F&amp;B</span>
         </button>
+
+        {/* Settings / Control Panel */}
+        <Link
+          href="/control-panel"
+          className="flex flex-col items-center justify-center gap-1 min-w-[44px] min-h-[44px] rounded-xl px-2 py-2 transition-all duration-200 active:scale-95"
+          style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}
+          title="컨트롤 패널"
+        >
+          <Icon icon="solar:settings-linear" className="text-xl lg:text-base w-6 h-6 lg:w-5 lg:h-5 text-white/40" />
+          <span className="text-[10px] leading-none text-white/30 lg:hidden">설정</span>
+        </Link>
       </div>
 
       {/* Charge modal — rendered in-place when needed from action bar */}

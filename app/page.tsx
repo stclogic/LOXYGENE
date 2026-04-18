@@ -198,6 +198,7 @@ function HamburgerMenu({
     { icon: "🖤", label: t.nav.black, href: "/rooms/black" },
     { icon: "🛍️", label: t.nav.shop, href: "/shop" },
     { icon: "🎭", label: t.nav.vibeDirector, href: "/entertainers" },
+    { icon: "⚙️", label: "컨트롤 패널", href: "/control-panel" },
   ];
 
   return (
@@ -723,6 +724,14 @@ function ProfileDropdown({
 
         {/* ── §6 My Activity ── */}
         <div className="px-2 py-1.5 flex flex-col">
+          <button
+            onClick={() => { onClose(); router.push("/control-panel"); }}
+            className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs text-white/55 hover:bg-white/[0.04] hover:text-white/85 transition-all text-left"
+          >
+            <span className="text-sm">⚙️</span>
+            컨트롤 패널
+            <Icon icon="solar:arrow-right-linear" className="w-3 h-3 ml-auto opacity-25" />
+          </button>
           <button
             onClick={() => { onClose(); router.push("/admin"); }}
             className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs text-white/55 hover:bg-white/[0.04] hover:text-white/85 transition-all text-left"

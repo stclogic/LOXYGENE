@@ -676,6 +676,15 @@ function LightingTab() {
   const [autoCorrect, setAutoCorrect] = useState(true);
   const [keyLight, setKeyLight] = useState(75);
   const [fillLight, setFillLight] = useState(40);
+  const [autoLighting, setAutoLighting] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem("loxygene-lighting-auto") === "true";
+  });
+
+  const handleAutoLighting = (v: boolean) => {
+    setAutoLighting(v);
+    localStorage.setItem("loxygene-lighting-auto", String(v));
+  };
 
   const devices = [
     { name: "L'Sync LED Strip #1", status: "connected" },
@@ -692,6 +701,14 @@ function LightingTab() {
 
   return (
     <div className="flex flex-col gap-5">
+      <Card>
+        <SectionTitle>자동 조명</SectionTitle>
+        <ControlRow
+          label="입장 시 자동 조명 켜기"
+          control={<Toggle checked={autoLighting} onChange={handleAutoLighting} />}
+        />
+        <p className="text-[10px] text-white/30 mt-1">룸 입장 시 L&apos;Sync 조명이 자동으로 활성화됩니다</p>
+      </Card>
       <Card>
         <SectionTitle>스마트 조명 연동</SectionTitle>
         <div className="flex flex-col gap-4">

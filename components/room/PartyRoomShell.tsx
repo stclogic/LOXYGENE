@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { Icon } from "@iconify/react";
 
@@ -33,6 +33,108 @@ interface Props {
   extraBarControls?: React.ReactNode;
 }
 
+// ── In-room mini settings components ──────────────────────────────────────
+
+function SettingRow({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex items-center justify-between py-3 border-b" style={{ borderColor: "rgba(255,255,255,0.05)" }}>
+      <span className="text-sm text-white/70">{label}</span>
+      {children}
+    </div>
+  );
+}
+
+function MiniToggle({ checked, onChange, label = "토글" }: { checked: boolean; onChange: (v: boolean) => void; label?: string }) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      onClick={() => onChange(!checked)}
+      className="relative flex-shrink-0 w-9 h-5 rounded-full transition-all duration-200"
+      style={{ background: checked ? "#06b6d4" : "rgba(255,255,255,0.1)", boxShadow: checked ? "0 0 8px rgba(6,182,212,0.35)" : "none" }}
+    >
+      <span className="absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-all duration-200" style={{ left: checked ? "calc(100% - 18px)" : "2px" }} />
+    </button>
+  );
+}
+
+function MiniSlider({ value, onChange, min = 0, max = 100, label = "슬라이더" }: { value: number; onChange: (v: number) => void; min?: number; max?: number; label?: string }) {
+  return (
+    <input
+      type="range" min={min} max={max} value={value}
+      aria-label={label}
+      onChange={e => onChange(Number(e.target.value))}
+      className="w-32 accent-cyan-400"
+    />
+  );
+}
+
+function InRoomAudioSettings() {
+  const [vol, setVol] = useState(80);
+  const [noise, setNoise] = useState(true);
+  const [echo, setEcho] = useState(true);
+  return (
+    <div className="flex flex-col">
+      <SettingRow label="마이크 볼륨"><MiniSlider value={vol} onChange={setVol} /></SettingRow>
+      <SettingRow label="노이즈 캔슬링"><MiniToggle checked={noise} onChange={setNoise} /></SettingRow>
+      <SettingRow label="에코 제거"><MiniToggle checked={echo} onChange={setEcho} /></SettingRow>
+    </div>
+  );
+}
+
+function InRoomVideoSettings() {
+  const [blur, setBlur] = useState(0);
+  const [vBg, setVBg] = useState(false);
+  return (
+    <div className="flex flex-col">
+      <SettingRow label="배경 블러"><MiniSlider value={blur} onChange={setBlur} /></SettingRow>
+      <SettingRow label="가상 배경"><MiniToggle checked={vBg} onChange={setVBg} /></SettingRow>
+    </div>
+  );
+}
+
+function InRoomEQSettings() {
+  const bands = [
+    { label: "저음",   key: "bass" },
+    { label: "중저음", key: "low-mid" },
+    { label: "중음",   key: "mid" },
+    { label: "중고음", key: "hi-mid" },
+    { label: "고음",   key: "treble" },
+  ];
+  const [vals, setVals] = useState<Record<string, number>>({ bass: 50, "low-mid": 50, mid: 50, "hi-mid": 50, treble: 50 });
+  return (
+    <div className="flex flex-col">
+      {bands.map(b => (
+        <SettingRow key={b.key} label={b.label}>
+          <MiniSlider value={vals[b.key]} onChange={v => setVals(p => ({ ...p, [b.key]: v }))} />
+        </SettingRow>
+      ))}
+    </div>
+  );
+}
+
+function InRoomLightingSettings() {
+  const [autoOn, setAutoOn] = useState(() =>
+    typeof window !== "undefined" ? localStorage.getItem("loxygene-lighting-auto") === "true" : false
+  );
+  const [brightness, setBrightness] = useState(70);
+
+  const toggle = (v: boolean) => {
+    setAutoOn(v);
+    localStorage.setItem("loxygene-lighting-auto", String(v));
+  };
+
+  return (
+    <div className="flex flex-col">
+      <SettingRow label="입장 시 자동 조명 켜기"><MiniToggle checked={autoOn} onChange={toggle} /></SettingRow>
+      <SettingRow label="밝기"><MiniSlider value={brightness} onChange={setBrightness} /></SettingRow>
+      <p className="text-[11px] text-white/30 mt-3">전체 조명 설정은 컨트롤 패널에서 확인하세요.</p>
+    </div>
+  );
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+
 export function PartyRoomShell({
   roomName,
   roomSubtitle,
@@ -56,6 +158,29 @@ export function PartyRoomShell({
   const [bannerDismissed, setBannerDismissed] = useState(false);
   const [allMuted, setAllMuted] = useState(false);
   const [karaokeOn, setKaraokeOn] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsTab, setSettingsTab] = useState<"audio" | "video" | "eq" | "lighting">("audio");
+  const [lightingToastVisible, setLightingToastVisible] = useState(false);
+
+  // Lighting auto-on preference + toast on mount
+  useEffect(() => {
+    const autoOn = localStorage.getItem("loxygene-lighting-auto") === "true";
+    if (!autoOn) {
+      const shown = localStorage.getItem("loxygene-lighting-toast-shown");
+      if (!shown) {
+        setLightingToastVisible(true);
+        localStorage.setItem("loxygene-lighting-toast-shown", "true");
+        setTimeout(() => setLightingToastVisible(false), 3000);
+      }
+    }
+  }, []);
+
+  // ESC closes settings drawer
+  useEffect(() => {
+    const handleEsc = (e: KeyboardEvent) => { if (e.key === "Escape") setSettingsOpen(false); };
+    window.addEventListener("keydown", handleEsc);
+    return () => window.removeEventListener("keydown", handleEsc);
+  }, []);
 
   // Panel drag state
   const panelRef = useRef<HTMLDivElement>(null);
@@ -382,6 +507,95 @@ export function PartyRoomShell({
             />
           </div>
         </div>
+      )}
+
+      {/* ── LIGHTING TOAST ── */}
+      {lightingToastVisible && (
+        <div
+          className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-full text-xs text-white/80 text-center whitespace-nowrap pointer-events-none"
+          style={{ background: "rgba(15,23,42,0.92)", border: "1px solid rgba(255,255,255,0.1)", backdropFilter: "blur(12px)", boxShadow: "0 4px 20px rgba(0,0,0,0.4)" }}
+        >
+          💡 조명이 꺼져 있어요. 컨트롤 패널에서 켤 수 있어요.
+        </div>
+      )}
+
+      {/* ── FLOATING SETTINGS GEAR BUTTON ── */}
+      <button
+        onClick={() => setSettingsOpen(true)}
+        title="설정"
+        className="fixed z-30 flex items-center justify-center w-10 h-10 rounded-full transition-all hover:scale-110 active:scale-95"
+        style={{
+          bottom: 76,
+          right: 16,
+          background: "#0f172a",
+          border: "1px solid rgba(6,182,212,0.3)",
+          boxShadow: "0 4px 16px rgba(0,0,0,0.4)",
+        }}
+      >
+        <Icon icon="solar:settings-bold" className="w-5 h-5 text-cyan-400" />
+      </button>
+
+      {/* ── IN-ROOM SETTINGS DRAWER ── */}
+      {settingsOpen && (
+        <>
+          {/* Overlay */}
+          <div
+            className="fixed inset-0 z-40"
+            style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}
+            onClick={() => setSettingsOpen(false)}
+          />
+          {/* Drawer */}
+          <div
+            className="fixed left-0 right-0 bottom-0 z-50 flex flex-col rounded-t-2xl"
+            style={{ height: "70vh", background: "#0a0f1e", borderTop: "1px solid rgba(255,255,255,0.08)" }}
+          >
+            {/* Drawer header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b flex-shrink-0" style={{ borderColor: "rgba(255,255,255,0.07)" }}>
+              <div className="flex items-center gap-2">
+                <Icon icon="solar:settings-bold" className="w-4 h-4 text-cyan-400" />
+                <span className="text-sm font-bold text-white/80">설정</span>
+              </div>
+              <button
+                onClick={() => setSettingsOpen(false)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full transition-all"
+                style={{ background: "rgba(255,255,255,0.08)" }}
+                onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.15)")}
+                onMouseLeave={e => (e.currentTarget.style.background = "rgba(255,255,255,0.08)")}
+              >
+                <Icon icon="solar:close-circle-bold" className="w-5 h-5 text-white" />
+                <span className="text-xs text-white">닫기</span>
+              </button>
+            </div>
+
+            {/* Tab bar */}
+            <div className="flex border-b flex-shrink-0" style={{ borderColor: "rgba(255,255,255,0.07)" }}>
+              {(["audio", "video", "eq", "lighting"] as const).map(tab => {
+                const labels = { audio: "🎙️ 오디오", video: "📷 비디오", eq: "🎚️ EQ", lighting: "💡 조명" };
+                return (
+                  <button
+                    key={tab}
+                    onClick={() => setSettingsTab(tab)}
+                    className="flex-1 py-3 text-xs font-medium transition-all"
+                    style={{
+                      color: settingsTab === tab ? "#06b6d4" : "rgba(255,255,255,0.4)",
+                      borderBottom: settingsTab === tab ? "2px solid #06b6d4" : "2px solid transparent",
+                    }}
+                  >
+                    {labels[tab]}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Tab content */}
+            <div className="flex-1 overflow-y-auto p-5" style={{ scrollbarWidth: "none" }}>
+              {settingsTab === "audio" && <InRoomAudioSettings />}
+              {settingsTab === "video" && <InRoomVideoSettings />}
+              {settingsTab === "eq" && <InRoomEQSettings />}
+              {settingsTab === "lighting" && <InRoomLightingSettings />}
+            </div>
+          </div>
+        </>
       )}
 
       {/* ── SPACER (fills space between header bars and bottom bar) ── */}

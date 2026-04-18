@@ -84,21 +84,6 @@ function ControlPanelBody() {
   const { t } = useLanguage();
   return (
     <div className="p-5 flex flex-col gap-8">
-      {/* Control Panel link */}
-      <Link
-        href="/control-panel"
-        className="flex items-center gap-3 px-4 py-3 rounded-xl border transition-all group"
-        style={{ background: "rgba(0,229,255,0.04)", border: "1px solid rgba(0,229,255,0.15)" }}
-      >
-        <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: "rgba(0,229,255,0.10)" }}>
-          <Icon icon="solar:settings-bold" className="text-base text-[#00E5FF]" />
-        </div>
-        <div className="flex flex-col min-w-0">
-          <span className="text-xs font-semibold text-[#00E5FF] tracking-wide">컨트롤 패널</span>
-          <span className="text-[10px] text-white/35">오디오 · 비디오 · EQ · 조명</span>
-        </div>
-        <Icon icon="solar:arrow-right-linear" className="w-3.5 h-3.5 text-white/25 group-hover:text-[#00E5FF]/60 ml-auto transition-colors" />
-      </Link>
       {/* Kit Store */}
       <div className="flex flex-col gap-3">
         <div className="flex items-center justify-between">

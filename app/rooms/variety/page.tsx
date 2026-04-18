@@ -8,12 +8,12 @@ const ACCENT = "#FF8C00";
 const ACCENT2 = "#FFD700";
 
 const MOCK_ROOMS = [
-  { id: "v1", title: "진실or거짓 챔피언십 🏆", host: "게임마스터K", gameType: "진실or거짓", participants: 8, maxParticipants: 10, tags: ["#퀴즈", "#게임"], isLive: true },
-  { id: "v2", title: "스피드퀴즈 속도전 ⚡", host: "번개퀴즈왕", gameType: "스피드퀴즈", participants: 6, maxParticipants: 8, tags: ["#스피드", "#퀴즈"], isLive: true },
-  { id: "v3", title: "몸으로 말해요! 파티 🎭", host: "마임아티스트", gameType: "몸으로말해요", participants: 10, maxParticipants: 12, tags: ["#게임", "#벌칙"], isLive: true },
-  { id: "v4", title: "연예인 진실or거짓 🌟", host: "스타트래커", gameType: "진실or거짓", participants: 5, maxParticipants: 8, tags: ["#퀴즈", "#연예인"], isLive: true },
-  { id: "v5", title: "직장인 스트레스 해소 😤", host: "오피스워리어", gameType: "스피드퀴즈", participants: 4, maxParticipants: 6, tags: ["#스피드", "#직장인"], isLive: false },
-  { id: "v6", title: "커플 미션 챌린지 💑", host: "러브게임단", gameType: "몸으로말해요", participants: 6, maxParticipants: 8, tags: ["#커플", "#벌칙"], isLive: true },
+  { id: "v1", title: "진실or거짓 파티 🏆", host: "게임마스터K", hostAvatar: "👑", gameType: "진실or거짓", participants: 8, maxParticipants: 10, tags: ["#파티", "#게임", "#퀴즈"], vibe: "🎉 신나는", isLive: true },
+  { id: "v2", title: "스피드퀴즈 파티 ⚡", host: "번개퀴즈왕", hostAvatar: "⚡", gameType: "스피드퀴즈", participants: 6, maxParticipants: 8, tags: ["#파티", "#스피드"], vibe: "🔥 열정적", isLive: true },
+  { id: "v3", title: "몸으로 말해요! 파티 🎭", host: "마임아티스트", hostAvatar: "🎭", gameType: "몸으로말해요", participants: 10, maxParticipants: 12, tags: ["#파티", "#벌칙게임"], vibe: "🎉 신나는", isLive: true },
+  { id: "v4", title: "연예인 토크 파티 🌟", host: "스타트래커", hostAvatar: "🌟", gameType: "진실or거짓", participants: 5, maxParticipants: 8, tags: ["#파티", "#연예인"], vibe: "😊 편안함", isLive: true },
+  { id: "v5", title: "직장인 해방 파티 😤", host: "오피스워리어", hostAvatar: "💼", gameType: "스피드퀴즈", participants: 4, maxParticipants: 6, tags: ["#파티", "#직장인"], vibe: "🔥 열정적", isLive: false },
+  { id: "v6", title: "커플 미션 파티 💑", host: "러브게임단", hostAvatar: "💑", gameType: "몸으로말해요", participants: 6, maxParticipants: 8, tags: ["#파티", "#커플"], vibe: "😊 편안함", isLive: true },
 ];
 
 const GAME_TYPES = ["스피드퀴즈", "진실or거짓", "몸으로말해요"];

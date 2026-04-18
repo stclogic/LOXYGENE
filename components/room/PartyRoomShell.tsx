@@ -1,0 +1,477 @@
+"use client";
+
+import { useState, useRef } from "react";
+import Link from "next/link";
+import { Icon } from "@iconify/react";
+
+const MOCK_PARTICIPANTS = [
+  { id: "p1", name: "별빛가수", isPaid: true, isMuted: false, isKaraoke: true },
+  { id: "p2", name: "달빛연인", isPaid: true, isMuted: false, isKaraoke: false },
+  { id: "p3", name: "구름위", isPaid: false, isMuted: true, isKaraoke: false },
+  { id: "p4", name: "바람소리", isPaid: true, isMuted: false, isKaraoke: false },
+  { id: "p5", name: "하늘별", isPaid: false, isMuted: true, isKaraoke: false },
+  { id: "p6", name: "봄날의꿈", isPaid: true, isMuted: false, isKaraoke: false },
+];
+
+const BG_OPTIONS = [
+  { id: "city",       label: "🌃 도시야경",  from: "#0f0c29", via: "#302b63", to: "#24243e" },
+  { id: "beach",      label: "🏖️ 비치파티",  from: "#f7971e", via: "#ffd200", to: "#f7971e" },
+  { id: "fireworks",  label: "🎆 불꽃놀이",  from: "#360033", via: "#0b8793", to: "#360033" },
+  { id: "space",      label: "🌌 우주파티",  from: "#0f0c29", via: "#302b63", to: "#000000" },
+];
+
+const IS_FREE = false; // mock — derive from session in production
+
+interface Props {
+  roomName: string;
+  roomSubtitle?: string;
+  backHref: string;
+  accentColor?: string;
+  participantCount?: number;
+  panelTitle?: string;
+  panelContent?: React.ReactNode;
+  extraBarControls?: React.ReactNode;
+}
+
+export function PartyRoomShell({
+  roomName,
+  roomSubtitle,
+  backHref,
+  accentColor = "#00E5FF",
+  participantCount = 127,
+  panelTitle = "🎤 노래방",
+  panelContent,
+  extraBarControls,
+}: Props) {
+  const [micOn, setMicOn] = useState(false);
+  const [camOn, setCamOn] = useState(true);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [panelOpen, setPanelOpen] = useState(false);
+  const [gridCollapsed, setGridCollapsed] = useState(false);
+  const [bgPickerOpen, setBgPickerOpen] = useState(false);
+  const [selectedBg, setSelectedBg] = useState(BG_OPTIONS[0]);
+  const [spotlighted, setSpotlighted] = useState<string | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; pid: string } | null>(null);
+  const [isHost] = useState(true);
+  const [bannerDismissed, setBannerDismissed] = useState(false);
+  const [allMuted, setAllMuted] = useState(false);
+  const [karaokeOn, setKaraokeOn] = useState(false);
+
+  // Panel drag state
+  const panelRef = useRef<HTMLDivElement>(null);
+  const [panelDragged, setPanelDragged] = useState(false);
+  const [panelPos, setPanelPos] = useState({ x: 0, y: 0 });
+  const dragging = useRef(false);
+  const dragStart = useRef({ mx: 0, my: 0, px: 0, py: 0 });
+
+  const spotlightedP = MOCK_PARTICIPANTS.find(p => p.id === spotlighted);
+
+  const startDrag = (e: React.MouseEvent) => {
+    if (!panelRef.current) return;
+    const rect = panelRef.current.getBoundingClientRect();
+    dragging.current = true;
+    setPanelDragged(true);
+    dragStart.current = { mx: e.clientX, my: e.clientY, px: rect.left, py: rect.top };
+    const onMove = (ev: MouseEvent) => {
+      if (!dragging.current) return;
+      setPanelPos({
+        x: dragStart.current.px + ev.clientX - dragStart.current.mx,
+        y: dragStart.current.py + ev.clientY - dragStart.current.my,
+      });
+    };
+    const onUp = () => {
+      dragging.current = false;
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  };
+
+  return (
+    <div className="fixed inset-0 flex flex-col bg-[#070707] overflow-hidden">
+
+      {/* ── FULL-SCREEN HOST STAGE BACKGROUND ── */}
+      <div className="absolute inset-0 z-0">
+        <div
+          className="absolute inset-0"
+          style={{ background: `linear-gradient(135deg, ${selectedBg.from}, ${selectedBg.via}, ${selectedBg.to})` }}
+        />
+        {/* Mock camera silhouette */}
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none">
+          <span className="text-[18vw] opacity-[0.04]">{spotlightedP ? "👤" : "🎙️"}</span>
+        </div>
+        {/* Vignette */}
+        <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse at center, transparent 25%, rgba(0,0,0,0.8) 100%)" }} />
+        {/* Spotlight name tag */}
+        {spotlightedP && (
+          <div
+            className="absolute bottom-28 left-6 z-10 flex items-center gap-2 px-3 py-2 rounded-xl"
+            style={{ background: "rgba(0,0,0,0.65)", border: "1.5px solid rgba(0,229,255,0.55)", boxShadow: "0 0 18px rgba(0,229,255,0.2)", backdropFilter: "blur(12px)" }}
+          >
+            <span className="w-2 h-2 rounded-full bg-[#00E5FF] animate-pulse block" />
+            <span className="text-white font-semibold text-sm">{spotlightedP.name}</span>
+            <span className="text-[10px] text-[#00E5FF]">스포트라이트</span>
+          </div>
+        )}
+      </div>
+
+      {/* ── HEADER ── */}
+      <header
+        className="relative z-20 flex items-center justify-between px-4 py-3 flex-shrink-0"
+        style={{ background: "rgba(0,0,0,0.45)", backdropFilter: "blur(20px)", borderBottom: "1px solid rgba(255,255,255,0.05)" }}
+      >
+        <Link href={backHref} className="flex items-center gap-1.5 text-xs text-white/40 hover:text-white/70 transition-colors font-medium">
+          <Icon icon="solar:arrow-left-linear" className="w-4 h-4" /> 나가기
+        </Link>
+        <div className="flex flex-col items-center">
+          <h1 className="text-sm font-black tracking-widest" style={{ color: accentColor, textShadow: `0 0 10px ${accentColor}80` }}>
+            {roomName}
+          </h1>
+          {roomSubtitle && <p className="text-white/30 text-[10px] mt-0.5">{roomSubtitle}</p>}
+        </div>
+        <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-1 px-2 py-1 rounded-full" style={{ background: "rgba(239,68,68,0.15)", border: "1px solid rgba(239,68,68,0.3)" }}>
+            <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse block" />
+            <span className="text-[10px] text-red-400 font-semibold">LIVE</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <Icon icon="solar:user-bold" className="text-white/30 w-3.5 h-3.5" />
+            <span className="text-white/50 text-xs">{participantCount}</span>
+          </div>
+        </div>
+      </header>
+
+      {/* ── FREE MEMBER BANNER ── */}
+      {IS_FREE && !bannerDismissed && (
+        <div
+          className="relative z-20 flex items-center justify-between px-4 py-2 flex-shrink-0"
+          style={{ background: "rgba(0,229,255,0.07)", borderBottom: "1px solid rgba(0,229,255,0.18)" }}
+        >
+          <span className="text-xs text-[#00E5FF]">
+            🔒 마이크를 사용하려면 유료 멤버십이 필요합니다
+            <Link href="/payments/charge" className="ml-2 underline font-semibold hover:text-white transition-colors">업그레이드</Link>
+          </span>
+          <button onClick={() => setBannerDismissed(true)} className="text-[#00E5FF]/50 hover:text-[#00E5FF] ml-3 flex-shrink-0 transition-colors">
+            <Icon icon="solar:close-circle-linear" className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      {/* ── HOST TOOLS BAR ── */}
+      {isHost && (
+        <div
+          className="relative z-20 flex items-center gap-2 px-4 py-2 flex-shrink-0 overflow-x-auto"
+          style={{ background: "rgba(0,0,0,0.35)", borderBottom: "1px solid rgba(255,255,255,0.04)", scrollbarWidth: "none" }}
+        >
+          <div className="flex items-center gap-1.5 mr-2 flex-shrink-0">
+            <Icon icon="solar:crown-bold" className="w-3 h-3 text-yellow-400" />
+            <span className="text-[10px] font-bold text-yellow-400 tracking-wider">호스트 도구</span>
+          </div>
+          <button
+            onClick={() => { setKaraokeOn(v => !v); setPanelOpen(v => !v); }}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium transition-all flex-shrink-0"
+            style={{
+              background: karaokeOn ? "rgba(236,72,153,0.2)" : "rgba(255,255,255,0.05)",
+              border: `1px solid ${karaokeOn ? "rgba(236,72,153,0.5)" : "rgba(255,255,255,0.1)"}`,
+              color: karaokeOn ? "#ec4899" : "rgba(255,255,255,0.5)",
+            }}
+          >
+            🎤 노래방 {karaokeOn ? "ON" : "OFF"}
+          </button>
+          <button
+            onClick={() => setBgPickerOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium transition-all flex-shrink-0"
+            style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.5)" }}
+          >
+            🖼️ 배경 변경
+          </button>
+          <button
+            onClick={() => setAllMuted(v => !v)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium transition-all flex-shrink-0"
+            style={{
+              background: allMuted ? "rgba(239,68,68,0.15)" : "rgba(255,255,255,0.05)",
+              border: `1px solid ${allMuted ? "rgba(239,68,68,0.4)" : "rgba(255,255,255,0.1)"}`,
+              color: allMuted ? "#ef4444" : "rgba(255,255,255,0.5)",
+            }}
+          >
+            🔊 전체 {allMuted ? "뮤트중" : "마이크"}
+          </button>
+          <button
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium transition-all flex-shrink-0"
+            style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.5)" }}
+          >
+            🎯 참여자 선택
+          </button>
+        </div>
+      )}
+
+      {/* ── PARTICIPANT GRID (top-right floating overlay) ── */}
+      <div className="absolute z-30" style={{ top: isHost ? 148 : 108, right: 12 }}>
+        <div className="flex flex-col items-end gap-1.5">
+          <button
+            onClick={() => setGridCollapsed(v => !v)}
+            className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] transition-all"
+            style={{ background: "rgba(0,0,0,0.6)", border: "1px solid rgba(255,255,255,0.08)", backdropFilter: "blur(8px)", color: "rgba(255,255,255,0.4)" }}
+          >
+            <Icon icon={gridCollapsed ? "solar:users-group-two-rounded-bold" : "solar:arrow-right-linear"} className="w-3 h-3" />
+            {gridCollapsed ? `${MOCK_PARTICIPANTS.length}명` : "접기"}
+          </button>
+          {!gridCollapsed && (
+            <div className="grid grid-cols-2 gap-1.5" style={{ width: 168 }}>
+              {MOCK_PARTICIPANTS.map(p => (
+                <div
+                  key={p.id}
+                  className="relative rounded-xl overflow-hidden cursor-pointer"
+                  style={{
+                    background: "rgba(255,255,255,0.06)",
+                    border: `1.5px solid ${p.isKaraoke ? "rgba(236,72,153,0.65)" : spotlighted === p.id ? "rgba(0,229,255,0.65)" : "rgba(255,255,255,0.08)"}`,
+                    boxShadow: p.isKaraoke ? "0 0 10px rgba(236,72,153,0.25)" : spotlighted === p.id ? "0 0 10px rgba(0,229,255,0.25)" : "none",
+                  }}
+                  onClick={e => { e.stopPropagation(); setContextMenu({ x: e.clientX, y: e.clientY, pid: p.id }); }}
+                >
+                  <div className="h-16 flex flex-col items-center justify-center gap-1 p-1">
+                    <span className="text-2xl">👤</span>
+                    <span className="text-[9px] text-white/70 truncate w-full text-center px-1 leading-tight">{p.name}</span>
+                  </div>
+                  <div className="absolute bottom-1 right-1 flex items-center gap-0.5">
+                    {p.isKaraoke && <span className="text-[9px] leading-none">🎤</span>}
+                    {p.isPaid
+                      ? <Icon icon={p.isMuted ? "solar:microphone-slash-bold" : "solar:microphone-bold"} className={`w-3 h-3 ${p.isMuted ? "text-white/15" : "text-white/60"}`} />
+                      : <span className="text-[9px]">🔒</span>
+                    }
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── PARTICIPANT CONTEXT MENU ── */}
+      {contextMenu && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setContextMenu(null)} />
+          <div
+            className="fixed z-50 rounded-xl overflow-hidden flex flex-col py-1"
+            style={{
+              top: Math.max(10, contextMenu.y - 10),
+              left: Math.min(contextMenu.x, window.innerWidth - 210),
+              minWidth: 195,
+              background: "rgba(8,8,20,0.96)",
+              border: "1px solid rgba(255,255,255,0.12)",
+              backdropFilter: "blur(24px)",
+              boxShadow: "0 20px 60px rgba(0,0,0,0.6)",
+            }}
+          >
+            {[
+              { icon: "solar:star-bold",              label: "메인으로 올리기",       action: () => setSpotlighted(contextMenu.pid) },
+              { icon: "solar:microphone-bold",         label: "마이크 켜기 / 끄기",    action: () => {} },
+              { icon: "solar:music-note-2-bold",       label: "노래방 마이크 활성화",  action: () => {} },
+              { icon: "solar:user-block-rounded-bold", label: "내보내기",              action: () => {}, danger: true },
+            ].map(item => (
+              <button
+                key={item.label}
+                onClick={() => { item.action(); setContextMenu(null); }}
+                className="flex items-center gap-2.5 px-4 py-2.5 text-xs hover:bg-white/5 transition-colors text-left"
+                style={{ color: item.danger ? "#ef4444" : "rgba(255,255,255,0.75)" }}
+              >
+                <Icon icon={item.icon} className="w-3.5 h-3.5 flex-shrink-0" />
+                {item.label}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+
+      {/* ── FLOATING OPTIONAL PANEL ── */}
+      {panelOpen && panelContent && (
+        <div
+          ref={panelRef}
+          className="absolute z-40 flex flex-col rounded-2xl overflow-hidden"
+          style={{
+            ...(panelDragged
+              ? { left: panelPos.x, top: panelPos.y }
+              : { right: 12, bottom: 72 }),
+            width: "min(360px, 92vw)",
+            maxHeight: "60vh",
+            background: "rgba(4,4,14,0.93)",
+            border: "1px solid rgba(255,255,255,0.1)",
+            backdropFilter: "blur(24px)",
+            boxShadow: "0 24px 64px rgba(0,0,0,0.7)",
+          }}
+        >
+          {/* Drag handle header */}
+          <div
+            className="flex items-center justify-between px-4 py-2.5 border-b cursor-move flex-shrink-0 select-none"
+            style={{ borderColor: "rgba(255,255,255,0.07)" }}
+            onMouseDown={startDrag}
+          >
+            <div className="flex items-center gap-2">
+              <Icon icon="solar:cursor-bold" className="w-3 h-3 text-white/20" />
+              <span className="text-xs font-bold text-white/70">{panelTitle}</span>
+            </div>
+            <button onClick={() => setPanelOpen(false)} className="text-white/30 hover:text-white/60 transition-colors ml-2">
+              <Icon icon="solar:close-circle-linear" className="w-4 h-4" />
+            </button>
+          </div>
+          <div className="overflow-y-auto flex-1" style={{ scrollbarWidth: "none" }}>
+            {panelContent}
+          </div>
+        </div>
+      )}
+
+      {/* ── BACKGROUND PICKER MODAL ── */}
+      {bgPickerOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4" style={{ background: "rgba(0,0,0,0.88)", backdropFilter: "blur(16px)" }}>
+          <div className="w-full max-w-sm rounded-2xl p-6 flex flex-col gap-4" style={{ background: "rgba(4,4,16,0.99)", border: "1px solid rgba(255,255,255,0.1)" }}>
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-bold text-white">🖼️ 배경 선택</h2>
+              <button onClick={() => setBgPickerOpen(false)} className="text-white/30 hover:text-white/60 transition-colors">
+                <Icon icon="solar:close-circle-bold" className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              {BG_OPTIONS.map(bg => (
+                <button
+                  key={bg.id}
+                  onClick={() => { setSelectedBg(bg); setBgPickerOpen(false); }}
+                  className="relative h-20 rounded-xl overflow-hidden transition-all flex items-end p-2"
+                  style={{
+                    background: `linear-gradient(135deg, ${bg.from}, ${bg.via}, ${bg.to})`,
+                    outline: selectedBg.id === bg.id ? "2px solid #00E5FF" : "none",
+                    outlineOffset: 2,
+                  }}
+                >
+                  <span className="relative z-10 text-[10px] font-semibold text-white drop-shadow-lg">{bg.label}</span>
+                </button>
+              ))}
+              <button
+                onClick={() => setBgPickerOpen(false)}
+                className="h-20 rounded-xl border flex flex-col items-center justify-center gap-1 transition-all hover:border-white/30"
+                style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.1)" }}
+              >
+                <Icon icon="solar:camera-bold" className="w-6 h-6 text-white/40" />
+                <span className="text-[10px] text-white/35">카메라</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── CHAT DRAWER ── */}
+      {chatOpen && (
+        <div
+          className="absolute right-0 top-0 bottom-0 z-30 flex flex-col w-72"
+          style={{ background: "rgba(4,4,14,0.93)", borderLeft: "1px solid rgba(255,255,255,0.07)", backdropFilter: "blur(24px)" }}
+        >
+          <div className="flex items-center justify-between px-4 py-3 border-b flex-shrink-0" style={{ borderColor: "rgba(255,255,255,0.07)" }}>
+            <span className="text-sm font-bold text-white/70">💬 채팅</span>
+            <button onClick={() => setChatOpen(false)} className="text-white/30 hover:text-white/60 transition-colors">
+              <Icon icon="solar:close-circle-linear" className="w-4 h-4" />
+            </button>
+          </div>
+          <div className="flex-1 p-3 flex items-center justify-center">
+            <p className="text-xs text-white/20">채팅이 여기에 표시됩니다</p>
+          </div>
+          <div className="p-3 border-t flex-shrink-0" style={{ borderColor: "rgba(255,255,255,0.07)" }}>
+            <input
+              placeholder="메시지 입력..."
+              className="w-full px-3 py-2 rounded-lg text-xs text-white outline-none placeholder-white/20"
+              style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)" }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* ── SPACER (fills space between header bars and bottom bar) ── */}
+      <div className="flex-1" />
+
+      {/* ── BOTTOM ACTION BAR ── */}
+      <div
+        className="relative z-20 flex-shrink-0 px-4 py-3 flex items-center gap-2"
+        style={{ background: "rgba(0,0,0,0.72)", backdropFilter: "blur(20px)", borderTop: "1px solid rgba(255,255,255,0.06)" }}
+      >
+        {/* Camera */}
+        <button
+          onClick={() => setCamOn(v => !v)}
+          className="w-12 h-12 rounded-xl flex items-center justify-center transition-all active:scale-90 flex-shrink-0"
+          style={{
+            background: camOn ? "rgba(0,229,255,0.1)" : "rgba(239,68,68,0.1)",
+            border: `1px solid ${camOn ? "rgba(0,229,255,0.4)" : "rgba(239,68,68,0.3)"}`,
+          }}
+        >
+          <Icon icon={camOn ? "solar:camera-bold" : "solar:camera-slash-bold"} className="w-5 h-5" style={{ color: camOn ? "#00E5FF" : "#ef4444" }} />
+        </button>
+
+        {/* Mic */}
+        <div className="relative flex-shrink-0" title={IS_FREE ? "유료 회원 전용" : undefined}>
+          <button
+            onClick={() => { if (!IS_FREE) setMicOn(v => !v); }}
+            className="w-12 h-12 rounded-xl flex items-center justify-center transition-all active:scale-90"
+            style={{
+              background: IS_FREE ? "rgba(255,255,255,0.03)" : micOn ? "rgba(0,229,255,0.1)" : "rgba(239,68,68,0.1)",
+              border: `1px solid ${IS_FREE ? "rgba(255,255,255,0.08)" : micOn ? "rgba(0,229,255,0.4)" : "rgba(239,68,68,0.3)"}`,
+              opacity: IS_FREE ? 0.5 : 1,
+              cursor: IS_FREE ? "not-allowed" : "pointer",
+            }}
+          >
+            <Icon
+              icon={micOn ? "solar:microphone-bold" : "solar:microphone-slash-bold"}
+              className="w-5 h-5"
+              style={{ color: IS_FREE ? "rgba(255,255,255,0.2)" : micOn ? "#00E5FF" : "#ef4444" }}
+            />
+          </button>
+          {IS_FREE && <span className="absolute -top-1 -right-1 text-[10px] leading-none">🔒</span>}
+        </div>
+
+        {/* Chat */}
+        <button
+          onClick={() => setChatOpen(v => !v)}
+          className="w-12 h-12 rounded-xl flex items-center justify-center transition-all active:scale-90 flex-shrink-0"
+          style={{
+            background: chatOpen ? "rgba(0,229,255,0.1)" : "rgba(255,255,255,0.05)",
+            border: `1px solid ${chatOpen ? "rgba(0,229,255,0.4)" : "rgba(255,255,255,0.1)"}`,
+          }}
+        >
+          <Icon icon="solar:chat-round-bold" className="w-5 h-5" style={{ color: chatOpen ? "#00E5FF" : "rgba(255,255,255,0.4)" }} />
+        </button>
+
+        {/* Gift */}
+        <button
+          className="w-12 h-12 rounded-xl flex items-center justify-center text-lg transition-all active:scale-90 flex-shrink-0"
+          style={{ background: "rgba(255,0,127,0.1)", border: "1px solid rgba(255,0,127,0.3)" }}
+        >
+          🎁
+        </button>
+
+        {/* Optional panel toggle */}
+        {panelContent && (
+          <button
+            onClick={() => setPanelOpen(v => !v)}
+            className="flex-1 h-12 rounded-xl flex items-center justify-center gap-2 font-medium text-sm transition-all active:scale-95 min-w-0"
+            style={{
+              background: panelOpen ? "rgba(236,72,153,0.15)" : "rgba(255,255,255,0.05)",
+              border: `1px solid ${panelOpen ? "rgba(236,72,153,0.4)" : "rgba(255,255,255,0.1)"}`,
+              color: panelOpen ? "#ec4899" : "rgba(255,255,255,0.45)",
+            }}
+          >
+            <span className="text-base">{panelTitle.split(" ")[0]}</span>
+            <span className="text-xs truncate hidden sm:block">{panelTitle.replace(/^[^\s]+\s/, "")}</span>
+          </button>
+        )}
+
+        {/* Room-specific extra controls */}
+        {extraBarControls}
+
+        {/* More */}
+        <button
+          className="w-12 h-12 rounded-xl flex items-center justify-center transition-all active:scale-90 flex-shrink-0"
+          style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}
+        >
+          <Icon icon="solar:menu-dots-bold" className="w-5 h-5 text-white/35" />
+        </button>
+      </div>
+    </div>
+  );
+}

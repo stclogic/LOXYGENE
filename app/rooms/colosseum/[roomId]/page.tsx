@@ -1,17 +1,16 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Icon } from "@iconify/react";
-import { MainViewport } from "@/components/room/MainViewport";
-import { SyncLyricBar } from "@/components/room/SyncLyricBar";
-import { Leaderboard } from "@/components/room/Leaderboard";
-import { PIPGrid } from "@/components/room/PIPGrid";
-import { BottomActionBar } from "@/components/room/BottomActionBar";
-import { GlassCard } from "@/components/ui/GlassCard";
-import { useRoomStore } from "@/lib/store/roomStore";
-import Link from "next/link";
-import { QuickCallModal } from "@/components/entertainers/QuickCallModal";
+import { PartyRoomShell } from "@/components/room/PartyRoomShell";
 import { hasNickname, setUserNickname, randomNickname } from "@/lib/utils/userSession";
+
+const MOCK_LYRICS = [
+  { text: "사랑했지만 이제는 모두 지나간 일", active: false },
+  { text: "그대 없인 살 수 없다 했던 말들이", active: true },
+  { text: "이제는 모두 거짓말이 되어버렸네", active: false },
+  { text: "행복했던 우리의 날들이여", active: false },
+];
 
 const MOCK_QUEUE = [
   { id: "q1", nickname: "가을바람", songTitle: "사랑했지만 (김광석)", position: 1 },
@@ -20,13 +19,94 @@ const MOCK_QUEUE = [
   { id: "q4", nickname: "하늘별", songTitle: "그녀가 처음 울던 날", position: 4 },
 ];
 
-export default function ColosseumRoomPage({ params }: { params: { roomId: string } }) {
-  const [showQueue, setShowQueue] = useState(true);
-  const [lastGift, setLastGift] = useState<string | null>(null);
-  const [directorOpen, setDirectorOpen] = useState(false);
-  const gifts = useRoomStore((s) => s.gifts);
+function KaraokePanelContent() {
+  return (
+    <div className="flex flex-col gap-4 p-4">
+      {/* Now playing */}
+      <div>
+        <p className="text-[10px] text-white/30 tracking-widest font-medium mb-2">NOW PLAYING</p>
+        <div className="flex items-center gap-3 p-3 rounded-xl" style={{ background: "rgba(0,229,255,0.05)", border: "1px solid rgba(0,229,255,0.12)" }}>
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: "rgba(0,229,255,0.1)" }}>
+            <Icon icon="solar:microphone-bold" className="w-4 h-4 text-[#00E5FF]" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-xs font-semibold text-white/90 truncate">사랑했지만</p>
+            <p className="text-[10px] text-white/40 truncate">김광석 · 별빛가수 노래 중</p>
+          </div>
+        </div>
+      </div>
 
-  // Nickname modal
+      {/* Lyrics */}
+      <div className="flex flex-col gap-1.5">
+        <p className="text-[10px] text-white/30 tracking-widest font-medium">가사</p>
+        {MOCK_LYRICS.map((line, i) => (
+          <p
+            key={i}
+            className="text-sm leading-relaxed transition-all px-1"
+            style={{
+              color: line.active ? "#00E5FF" : "rgba(255,255,255,0.3)",
+              fontWeight: line.active ? 600 : 400,
+              textShadow: line.active ? "0 0 12px rgba(0,229,255,0.5)" : "none",
+            }}
+          >
+            {line.text}
+          </p>
+        ))}
+      </div>
+
+      {/* Mic level */}
+      <div>
+        <p className="text-[10px] text-white/30 tracking-widest font-medium mb-2">MIC LEVEL</p>
+        <div className="flex items-end gap-0.5 h-6">
+          {Array.from({ length: 20 }).map((_, i) => (
+            <div
+              key={i}
+              className="flex-1 rounded-sm"
+              style={{
+                background: i < 14 ? "#00E5FF" : i < 17 ? "#FFD700" : "#ef4444",
+                height: `${30 + Math.abs(Math.sin(i * 0.7)) * 70}%`,
+                opacity: i < 10 ? 1 : 0.4,
+              }}
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* Queue */}
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-[10px] text-white/30 tracking-widest font-medium">대기열</p>
+          <span className="text-[10px] text-[#00E5FF]">{MOCK_QUEUE.length}명</span>
+        </div>
+        <div className="flex flex-col gap-1.5">
+          {MOCK_QUEUE.map(entry => (
+            <div
+              key={entry.id}
+              className="flex items-center gap-2.5 p-2.5 rounded-lg"
+              style={{
+                background: entry.position === 1 ? "rgba(0,229,255,0.06)" : "rgba(255,255,255,0.02)",
+                border: entry.position === 1 ? "1px solid rgba(0,229,255,0.15)" : "1px solid rgba(255,255,255,0.04)",
+              }}
+            >
+              <span className="text-xs font-black w-4 text-center flex-shrink-0" style={{ color: entry.position === 1 ? "#00E5FF" : "rgba(255,255,255,0.25)" }}>
+                {entry.position}
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-white/80 text-xs font-semibold truncate">{entry.nickname}</p>
+                <p className="text-white/35 text-[10px] truncate">{entry.songTitle}</p>
+              </div>
+              {entry.position === 1 && (
+                <Icon icon="solar:microphone-bold" className="text-[#00E5FF] w-3.5 h-3.5 flex-shrink-0 animate-pulse" />
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function ColosseumRoomPage({ params }: { params: { roomId: string } }) {
   const [nicknameModalOpen, setNicknameModalOpen] = useState(false);
   const [nicknameInput, setNicknameInput] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -46,174 +126,32 @@ export default function ColosseumRoomPage({ params }: { params: { roomId: string
     setNicknameModalOpen(false);
   };
 
-  useEffect(() => {
-    if (gifts.length > 0) {
-      const latest = gifts[gifts.length - 1];
-      setLastGift(latest.type === "bouquet" ? "💐 꽃다발 전송!" : "🍾 샴페인 전송!");
-      const t = setTimeout(() => setLastGift(null), 2000);
-      return () => clearTimeout(t);
-    }
-  }, [gifts]);
-
   return (
-    // Mobile: natural scroll (min-h-screen). Desktop: fixed viewport (h-screen overflow-hidden).
-    <div className="flex flex-col bg-[#070707] min-h-screen lg:h-screen lg:overflow-hidden relative overflow-x-hidden">
-
-      {/* Home button */}
-      <Link
-        href="/"
-        className="fixed top-4 left-4 z-50 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-[#00E5FF] bg-white/10 backdrop-blur-md border border-white/10 hover:border-[#00E5FF]/50 transition-all"
-      >
-        ← L&apos;OXYGÈNE
-      </Link>
-
-      {/* Director FAB */}
-      <button
-        onClick={() => setDirectorOpen(true)}
-        className="fixed top-14 left-4 z-50 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all hover:scale-105 active:scale-95"
-        style={{ background: "rgba(255,0,127,0.1)", border: "1px solid rgba(255,0,127,0.35)", color: "#FF007F", backdropFilter: "blur(12px)", boxShadow: "0 0 12px rgba(255,0,127,0.15)" }}
-      >
-        <Icon icon="solar:user-star-bold" className="w-3.5 h-3.5" />
-        디렉터 호출
-      </button>
-      <QuickCallModal open={directorOpen} onClose={() => setDirectorOpen(false)} roomId={params.roomId} />
-
-      {/* Background blobs */}
-      <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute top-0 left-0 w-80 h-80 rounded-full opacity-10"
-          style={{ background: "radial-gradient(circle, #00E5FF 0%, transparent 70%)", filter: "blur(80px)", animation: "float-blob 12s ease-in-out infinite" }} />
-        <div className="absolute bottom-0 right-0 w-80 h-80 rounded-full opacity-10"
-          style={{ background: "radial-gradient(circle, #FF007F 0%, transparent 70%)", filter: "blur(80px)", animation: "float-blob 14s ease-in-out infinite reverse" }} />
-      </div>
-
-      {/* Top nav */}
-      <div className="relative z-20 flex items-center justify-between px-4 py-3 shrink-0"
-        style={{ background: "rgba(7,7,7,0.9)", borderBottom: "1px solid rgba(255,255,255,0.04)", backdropFilter: "blur(20px)" }}>
-        <Link href="/rooms/colosseum" className="flex items-center gap-2 text-white/50 hover:text-white/80 transition-colors">
-          <Icon icon="solar:arrow-left-bold" className="w-5 h-5" />
-          <span className="text-sm">나가기</span>
-        </Link>
-
-        <div className="flex flex-col items-center">
-          <h1 className="text-[#00E5FF] font-black text-sm tracking-widest" style={{ textShadow: "0 0 10px rgba(0,229,255,0.5)" }}>
-            THE COLOSSEUM
-          </h1>
-          <p className="text-white/40 text-xs hidden sm:block">90년대 감성 여행 🎵</p>
-        </div>
-
-        <div className="flex items-center gap-2 sm:gap-3">
-          <button onClick={() => setShowQueue(!showQueue)}
-            className="flex items-center gap-1.5 text-white/50 hover:text-white/80 text-xs transition-colors">
-            <Icon icon="solar:list-bold" className="w-4 h-4" />
-            <span className="hidden sm:inline">대기열</span>
-          </button>
-          <div className="flex items-center gap-1.5">
-            <Icon icon="solar:user-bold" className="text-white/40 w-4 h-4" />
-            <span className="text-white/60 text-sm">127</span>
-          </div>
-        </div>
-      </div>
-
-      {/*
-        Content area:
-        - Mobile: flex-col, natural height, padded bottom for fixed action bar
-        - Desktop: flex-row, flex-1, overflow-hidden
-      */}
-      <div className="relative z-10 flex flex-col lg:flex-row flex-1 gap-3 p-3
-                      pb-[88px] lg:pb-3
-                      lg:overflow-hidden">
-
-        {/* Left column: video + lyrics + pip + (desktop) action bar */}
-        <div className="flex-1 flex flex-col gap-3 min-w-0 lg:overflow-hidden">
-
-          {/* Video — fills remaining desktop height; natural aspect ratio on mobile */}
-          <div className="lg:flex-1 lg:min-h-0">
-            <MainViewport singerName="별빛가수" songTitle="사랑했지만" artistName="김광석" />
-          </div>
-
-          <SyncLyricBar />
-
-          {/* PIP Grid */}
-          <div className="p-3 rounded-xl" style={{ background: "rgba(255,255,255,0.01)", border: "1px solid rgba(255,255,255,0.04)" }}>
-            <div className="flex items-center gap-2 mb-2.5">
-              <Icon icon="solar:users-group-two-rounded-bold" className="text-white/30 w-4 h-4" />
-              <span className="text-white/30 text-xs">참여자</span>
-            </div>
-            <PIPGrid />
-          </div>
-
-          {/* Action bar — in flow on DESKTOP only */}
-          <div className="hidden lg:block">
-            <BottomActionBar />
-          </div>
-        </div>
-
-        {/* Right panel: Leaderboard + Queue
-            Mobile: full width below left column
-            Desktop: fixed-width sidebar */}
-        <div className="flex flex-col gap-3 w-full lg:w-56 lg:flex-shrink-0 lg:overflow-y-auto hide-scrollbar">
-          <Leaderboard />
-
-          {showQueue && (
-            <GlassCard className="p-4 flex flex-col min-h-0">
-              <div className="flex items-center gap-2 mb-4">
-                <Icon icon="solar:microphone-bold" className="text-[#00E5FF] w-4 h-4" />
-                <h3 className="text-white font-bold text-sm tracking-wider">대기열</h3>
-                <span className="ml-auto text-xs px-2 py-0.5 rounded-full"
-                  style={{ background: "rgba(0,229,255,0.1)", color: "#00E5FF", border: "1px solid rgba(0,229,255,0.2)" }}>
-                  {MOCK_QUEUE.length}명
-                </span>
-              </div>
-              <div className="space-y-2.5 overflow-y-auto">
-                {MOCK_QUEUE.map((entry) => (
-                  <div key={entry.id} className="flex items-start gap-2.5 p-2.5 rounded-lg"
-                    style={{
-                      background: entry.position === 1 ? "rgba(0,229,255,0.06)" : "rgba(255,255,255,0.02)",
-                      border: entry.position === 1 ? "1px solid rgba(0,229,255,0.15)" : "1px solid rgba(255,255,255,0.03)",
-                    }}>
-                    <span className="text-xs font-black w-5 text-center flex-shrink-0 mt-0.5"
-                      style={{ color: entry.position === 1 ? "#00E5FF" : "rgba(255,255,255,0.3)" }}>
-                      {entry.position}
-                    </span>
-                    <div className="min-w-0">
-                      <p className="text-white/80 text-xs font-semibold truncate">{entry.nickname}</p>
-                      <p className="text-white/40 text-[11px] truncate mt-0.5">{entry.songTitle}</p>
-                    </div>
-                    {entry.position === 1 && (
-                      <Icon icon="solar:microphone-bold" className="text-[#00E5FF] w-3.5 h-3.5 flex-shrink-0 mt-0.5 animate-neon-pulse" />
-                    )}
-                  </div>
-                ))}
-              </div>
-            </GlassCard>
-          )}
-        </div>
-      </div>
-
-      {/* Mobile fixed action bar — shown only below lg, fixed at bottom */}
-      <div className="lg:hidden fixed bottom-0 inset-x-0 z-30 px-3 pt-3 pb-3"
-        style={{ background: "linear-gradient(to top, rgba(7,7,7,0.98) 70%, transparent)" }}>
-        <BottomActionBar />
-      </div>
-
-      {/* Gift toast */}
-      {lastGift && (
-        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 px-5 py-2.5 rounded-full font-semibold text-sm whitespace-nowrap"
-          style={{ background: "rgba(255,0,127,0.15)", border: "1px solid rgba(255,0,127,0.4)", color: "#FF007F", boxShadow: "0 0 20px rgba(255,0,127,0.3)" }}>
-          {lastGift}
-        </div>
-      )}
+    <>
+      <PartyRoomShell
+        roomName="THE COLOSSEUM"
+        roomSubtitle={`룸 ${params.roomId}`}
+        backHref="/rooms/colosseum"
+        accentColor="#00E5FF"
+        participantCount={127}
+        panelTitle="🎤 노래방"
+        panelContent={<KaraokePanelContent />}
+      />
 
       {/* Nickname entry modal */}
       {nicknameModalOpen && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center px-4"
-          style={{ background: "rgba(0,0,0,0.88)", backdropFilter: "blur(12px)" }}>
-          <div className="w-full max-w-sm rounded-2xl p-7 flex flex-col gap-5"
-            style={{ background: "rgba(10,10,10,0.99)", border: "1px solid rgba(0,229,255,0.2)", boxShadow: "0 0 40px rgba(0,229,255,0.1)" }}>
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center px-4"
+          style={{ background: "rgba(0,0,0,0.92)", backdropFilter: "blur(16px)" }}
+        >
+          <div
+            className="w-full max-w-sm rounded-2xl p-7 flex flex-col gap-5"
+            style={{ background: "rgba(8,8,20,0.99)", border: "1px solid rgba(0,229,255,0.2)", boxShadow: "0 0 40px rgba(0,229,255,0.08)" }}
+          >
             <div className="text-center">
-              <span className="text-3xl">🎤</span>
-              <h2 className="text-white font-black text-lg mt-2">닉네임을 입력하세요</h2>
-              <p className="text-white/35 text-sm mt-1">룸에서 사용할 이름을 정해주세요</p>
+              <span className="text-3xl">🎉</span>
+              <h2 className="text-white font-black text-lg mt-2">파티에 오신 것을 환영합니다!</h2>
+              <p className="text-white/35 text-sm mt-1">룸에서 사용할 닉네임을 정해주세요</p>
             </div>
             <div className="relative">
               <input
@@ -221,7 +159,7 @@ export default function ColosseumRoomPage({ params }: { params: { roomId: string
                 value={nicknameInput}
                 onChange={e => setNicknameInput(e.target.value)}
                 onKeyDown={e => { if (e.key === "Enter") handleNicknameSubmit(); }}
-                placeholder="예: 노래왕김씨"
+                placeholder="예: 파티왕김씨"
                 maxLength={20}
                 className="w-full bg-white/5 text-white text-sm px-4 py-3 rounded-xl outline-none placeholder-white/20"
                 style={{ border: "1px solid rgba(0,229,255,0.3)" }}
@@ -242,11 +180,11 @@ export default function ColosseumRoomPage({ params }: { params: { roomId: string
               className="w-full py-3 rounded-xl font-black text-sm tracking-wider transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
               style={{ background: "rgba(0,229,255,0.12)", border: "1px solid rgba(0,229,255,0.4)", color: "#00E5FF" }}
             >
-              입장하기
+              파티 입장하기 🎉
             </button>
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }

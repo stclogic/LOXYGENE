@@ -8,12 +8,12 @@ const ACCENT = "#06b6d4";
 const ACCENT2 = "#0ea5e9";
 
 const MOCK_ROOMS = [
-  { id: "dj1", title: "하우스 파티 나이트 🏠", dj: "DJ Cyan", genre: "하우스", bpm: 128, listeners: 94, tags: ["#하우스", "#EDM"], isLive: true },
-  { id: "dj2", title: "테크노 언더그라운드 ⚡", dj: "DJ Matrix", genre: "테크노", bpm: 145, listeners: 67, tags: ["#테크노", "#다크"], isLive: true },
-  { id: "dj3", title: "K-POP 리믹스 파티 🇰🇷", dj: "DJ Seoul", genre: "K-POP", bpm: 122, listeners: 183, tags: ["#KPOP", "#리믹스"], isLive: true },
-  { id: "dj4", title: "칠아웃 lo-fi 비트 🌙", dj: "DJ Midnight", genre: "Lo-Fi", bpm: 85, listeners: 41, tags: ["#lofi", "#칠아웃"], isLive: true },
-  { id: "dj5", title: "90s 레이브 복각 🕹️", dj: "DJ Retro", genre: "테크노", bpm: 138, listeners: 28, tags: ["#90s", "#레이브"], isLive: false },
-  { id: "dj6", title: "Latin Bass 열풍 💃", dj: "DJ Salsa", genre: "Latin", bpm: 116, listeners: 55, tags: ["#라틴", "#살사"], isLive: true },
+  { id: "dj1", title: "하우스 파티 나이트 🏠", dj: "DJ Cyan", djAvatar: "🎧", genre: "하우스", bpm: 128, listeners: 94, tags: ["#파티", "#하우스", "#EDM"], vibe: "🔥 열정적", isLive: true },
+  { id: "dj2", title: "테크노 언더그라운드 ⚡", dj: "DJ Matrix", djAvatar: "⚡", genre: "테크노", bpm: 145, listeners: 67, tags: ["#파티", "#테크노"], vibe: "🔥 열정적", isLive: true },
+  { id: "dj3", title: "K-POP 리믹스 파티 🇰🇷", dj: "DJ Seoul", djAvatar: "🌸", genre: "K-POP", bpm: 122, listeners: 183, tags: ["#파티", "#KPOP"], vibe: "🎉 신나는", isLive: true },
+  { id: "dj4", title: "칠아웃 Lo-Fi 파티 🌙", dj: "DJ Midnight", djAvatar: "🌙", genre: "Lo-Fi", bpm: 85, listeners: 41, tags: ["#파티", "#lofi", "#칠아웃"], vibe: "😊 편안함", isLive: true },
+  { id: "dj5", title: "90s 레이브 파티 🕹️", dj: "DJ Retro", djAvatar: "🕹️", genre: "테크노", bpm: 138, listeners: 28, tags: ["#파티", "#90s"], vibe: "🎉 신나는", isLive: false },
+  { id: "dj6", title: "Latin 파티 나이트 💃", dj: "DJ Salsa", djAvatar: "💃", genre: "Latin", bpm: 116, listeners: 55, tags: ["#파티", "#라틴"], vibe: "🎉 신나는", isLive: true },
 ];
 
 const GENRE_COLORS: Record<string, string> = {
@@ -79,40 +79,54 @@ export default function DJLobbyPage() {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {filtered.map(room => (
-            <div key={room.id} className="group rounded-2xl p-5 flex flex-col gap-4 transition-all hover:scale-[1.01]"
+            <div key={room.id} className="group rounded-2xl p-5 flex flex-col gap-3 transition-all hover:scale-[1.01]"
               style={{ background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.07)", backdropFilter: "blur(20px)" }}>
-              <div className="flex items-start justify-between gap-2">
+              {/* DJ avatar + badges */}
+              <div className="flex items-start gap-3">
+                <div className="w-11 h-11 rounded-xl flex items-center justify-center text-2xl flex-shrink-0"
+                  style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)" }}>
+                  {room.djAvatar}
+                </div>
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1.5">
-                    {room.isLive && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: "rgba(255,50,50,0.18)", border: "1px solid rgba(255,50,50,0.4)", color: "#ff5555" }}>LIVE</span>}
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: `${GENRE_COLORS[room.genre] ?? ACCENT}15`, border: `1px solid ${GENRE_COLORS[room.genre] ?? ACCENT}40`, color: GENRE_COLORS[room.genre] ?? ACCENT }}>
-                      #{room.genre}
-                    </span>
+                  <div className="flex items-center gap-2 mb-0.5 flex-wrap">
+                    {room.isLive
+                      ? <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: "rgba(239,68,68,0.18)", border: "1px solid rgba(239,68,68,0.4)", color: "#f87171" }}>🔴 LIVE</span>
+                      : <span className="text-[10px] px-2 py-0.5 rounded-full text-white/25" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>예정</span>
+                    }
+                    <span className="text-[10px] text-white/35">{room.vibe}</span>
                   </div>
                   <h3 className="text-white font-bold text-sm leading-tight group-hover:text-cyan-400 transition-colors">{room.title}</h3>
-                  <div className="flex items-center gap-1.5 mt-1"><Icon icon="solar:headphones-round-sound-bold" className="text-white/30 w-3.5 h-3.5" /><span className="text-white/40 text-xs">{room.dj}</span></div>
+                  <p className="text-white/40 text-xs mt-0.5">DJ · {room.dj}</p>
                 </div>
                 <div className="flex-shrink-0 text-right">
-                  <div className="text-lg font-black tabular-nums" style={{ color: ACCENT }}>{room.bpm}</div>
+                  <div className="text-base font-black tabular-nums" style={{ color: ACCENT }}>{room.bpm}</div>
                   <div className="text-[9px] text-white/30">BPM</div>
                 </div>
               </div>
 
-              <div className="flex items-center gap-3 text-xs text-white/40">
-                <div className="flex items-center gap-1"><Icon icon="solar:ear-bold" className="w-3.5 h-3.5" /><span>{room.listeners}명 청취</span></div>
+              {/* Avatar stack + listeners */}
+              <div className="flex items-center gap-2">
+                <div className="flex -space-x-1.5">
+                  {["👤","😊","🎵"].map((a, i) => (
+                    <div key={i} className="w-6 h-6 rounded-full flex items-center justify-center text-xs"
+                      style={{ background: "rgba(255,255,255,0.08)", border: "1.5px solid rgba(7,7,7,0.9)" }}>{a}</div>
+                  ))}
+                </div>
+                <span className="text-xs text-white/40">+{room.listeners}명</span>
               </div>
 
-              <div className="flex gap-2">
-                {/* BPM mini bars */}
-                {Array.from({ length: 8 }).map((_, i) => (
-                  <div key={i} className="flex-1 rounded-full" style={{ height: 4 + (i % 3) * 4, background: room.isLive ? `${ACCENT}${40 + i * 8}` : "rgba(255,255,255,0.06)", transition: "height 0.3s" }} />
+              {/* Tags */}
+              <div className="flex gap-1 flex-wrap">
+                {room.tags.map(t => (
+                  <span key={t} className="text-[10px] px-2 py-0.5 rounded-full"
+                    style={{ background: `${GENRE_COLORS[room.genre] ?? ACCENT}12`, color: `${GENRE_COLORS[room.genre] ?? ACCENT}cc`, border: `1px solid ${GENRE_COLORS[room.genre] ?? ACCENT}30` }}>{t}</span>
                 ))}
               </div>
 
               <Link href={`/rooms/dj/${room.id}`}
                 className="flex items-center justify-center gap-2 py-2.5 rounded-xl font-bold text-sm transition-all active:scale-95"
                 style={{ background: `rgba(6,182,212,0.12)`, border: `1px solid ${ACCENT}40`, color: ACCENT }}>
-                입장하기 →
+                파티 입장 →
               </Link>
             </div>
           ))}

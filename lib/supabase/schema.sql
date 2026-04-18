@@ -178,3 +178,30 @@ create index if not exists idx_transactions_receiver on transactions(receiver_id
 create index if not exists idx_transactions_room on transactions(room_id);
 create index if not exists idx_charge_orders_user on charge_orders(user_id);
 create index if not exists idx_charge_orders_idempotency on charge_orders(idempotency_key);
+
+-- ── Auth: Users table ─────────────────────────────────────────────────────────
+create table if not exists users (
+  id uuid default gen_random_uuid() primary key,
+  email text unique not null,
+  nickname text not null,
+  password_hash text,
+  provider text default 'email',
+  provider_id text,
+  avatar_url text,
+  role text default 'user',
+  coins integer default 0,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+-- RLS on users
+alter table users enable row level security;
+
+-- Users can read their own row
+create policy "users: self-read" on users
+  for select using (auth.uid()::text = id::text);
+
+-- Service role has full access (used server-side in API routes)
+-- Enable via Supabase dashboard: Settings → API → Service role key
+
+create index if not exists idx_users_email on users(email);

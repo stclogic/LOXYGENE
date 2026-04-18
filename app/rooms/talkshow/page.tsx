@@ -8,12 +8,12 @@ const ACCENT = "#8B5CF6";
 const ACCENT2 = "#C4B5FD";
 
 const MOCK_ROOMS = [
-  { id: "ts1", title: "요즘 연애가 어려운 이유", host: "철학자김씨", topic: "연애", panels: 3, audience: 28, tags: ["#연애", "#관계"], isLive: true },
-  { id: "ts2", title: "30대의 인생 방향 토크", host: "인생설계사", topic: "인생", panels: 4, audience: 45, tags: ["#인생", "#30대"], isLive: true },
-  { id: "ts3", title: "취미로 먹고살 수 있을까?", host: "프리랜서A", topic: "취미", panels: 2, audience: 19, tags: ["#취미", "#부업"], isLive: true },
-  { id: "ts4", title: "직장 vs 창업, 당신의 선택은?", host: "스타트업러버", topic: "커리어", panels: 3, audience: 62, tags: ["#커리어", "#창업"], isLive: true },
-  { id: "ts5", title: "MZ세대 소통법 분석", host: "트렌드워처", topic: "문화", panels: 4, audience: 33, tags: ["#MZ", "#문화"], isLive: false },
-  { id: "ts6", title: "결혼, 해야 할까? 말아야 할까?", host: "솔직한사람", topic: "연애", panels: 3, audience: 57, tags: ["#결혼", "#연애"], isLive: true },
+  { id: "ts1", title: "요즘 연애가 어려운 이유", host: "철학자김씨", hostAvatar: "🎙️", topic: "연애", panels: 3, audience: 28, tags: ["#파티", "#연애", "#관계"], vibe: "😊 편안함", isLive: true },
+  { id: "ts2", title: "30대의 인생 방향 토크", host: "인생설계사", hostAvatar: "🧭", topic: "인생", panels: 4, audience: 45, tags: ["#파티", "#인생", "#30대"], vibe: "😊 편안함", isLive: true },
+  { id: "ts3", title: "취미로 먹고살 수 있을까?", host: "프리랜서A", hostAvatar: "🎨", topic: "취미", panels: 2, audience: 19, tags: ["#파티", "#취미"], vibe: "🎉 신나는", isLive: true },
+  { id: "ts4", title: "직장 vs 창업, 당신의 선택은?", host: "스타트업러버", hostAvatar: "🚀", topic: "커리어", panels: 3, audience: 62, tags: ["#파티", "#커리어"], vibe: "🔥 열정적", isLive: true },
+  { id: "ts5", title: "MZ세대 소통법 분석", host: "트렌드워처", hostAvatar: "📱", topic: "문화", panels: 4, audience: 33, tags: ["#파티", "#MZ"], vibe: "🎉 신나는", isLive: false },
+  { id: "ts6", title: "결혼, 해야 할까? 말아야 할까?", host: "솔직한사람", hostAvatar: "💍", topic: "연애", panels: 3, audience: 57, tags: ["#파티", "#결혼"], vibe: "😊 편안함", isLive: true },
 ];
 
 const TOPIC_COLORS: Record<string, string> = {
@@ -78,36 +78,51 @@ export default function TalkShowLobbyPage() {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {filtered.map(room => (
-            <div key={room.id} className="group rounded-2xl p-5 flex flex-col gap-4 transition-all hover:scale-[1.01]"
+            <div key={room.id} className="group rounded-2xl p-5 flex flex-col gap-3 transition-all hover:scale-[1.01]"
               style={{ background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.07)", backdropFilter: "blur(20px)" }}>
-              <div className="flex items-start justify-between gap-2">
+              {/* Host + badges */}
+              <div className="flex items-start gap-3">
+                <div className="w-11 h-11 rounded-xl flex items-center justify-center text-2xl flex-shrink-0"
+                  style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)" }}>
+                  {room.hostAvatar}
+                </div>
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1.5">
-                    {room.isLive && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: "rgba(255,50,50,0.18)", border: "1px solid rgba(255,50,50,0.4)", color: "#ff5555" }}>LIVE</span>}
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: `${TOPIC_COLORS[room.topic] ?? ACCENT}18`, border: `1px solid ${TOPIC_COLORS[room.topic] ?? ACCENT}40`, color: TOPIC_COLORS[room.topic] ?? ACCENT }}>
-                      #{room.topic}
-                    </span>
+                  <div className="flex items-center gap-2 mb-0.5 flex-wrap">
+                    {room.isLive
+                      ? <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: "rgba(239,68,68,0.18)", border: "1px solid rgba(239,68,68,0.4)", color: "#f87171" }}>🔴 LIVE</span>
+                      : <span className="text-[10px] px-2 py-0.5 rounded-full text-white/25" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>예정</span>
+                    }
+                    <span className="text-[10px] text-white/35">{room.vibe}</span>
                   </div>
                   <h3 className="text-white font-bold text-sm leading-tight group-hover:text-purple-300 transition-colors">{room.title}</h3>
-                  <div className="flex items-center gap-1.5 mt-1"><Icon icon="solar:user-bold" className="text-white/30 w-3 h-3" /><span className="text-white/40 text-xs">{room.host}</span></div>
+                  <p className="text-white/40 text-xs mt-0.5">호스트 · {room.host}</p>
                 </div>
               </div>
 
-              <div className="flex gap-3 text-xs text-white/40">
-                <div className="flex items-center gap-1"><Icon icon="solar:users-group-two-rounded-bold" className="w-3.5 h-3.5 text-purple-400" /><span>패널 {room.panels}명</span></div>
-                <div className="flex items-center gap-1"><Icon icon="solar:eye-bold" className="w-3.5 h-3.5" /><span>청중 {room.audience}명</span></div>
+              {/* Avatar stack + stats */}
+              <div className="flex items-center gap-2">
+                <div className="flex -space-x-1.5">
+                  {["👤","😊","🎵"].map((a, i) => (
+                    <div key={i} className="w-6 h-6 rounded-full flex items-center justify-center text-xs"
+                      style={{ background: "rgba(255,255,255,0.08)", border: "1.5px solid rgba(7,7,7,0.9)" }}>{a}</div>
+                  ))}
+                </div>
+                <span className="text-xs text-white/40">+{room.audience}명</span>
+                <span className="ml-auto text-[10px] text-white/30">패널 {room.panels}명</span>
               </div>
 
-              <div className="flex flex-wrap gap-1.5">
+              {/* Tags */}
+              <div className="flex flex-wrap gap-1">
                 {room.tags.map(t => (
-                  <span key={t} className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: "rgba(255,255,255,0.05)", color: "rgba(255,255,255,0.4)", border: "1px solid rgba(255,255,255,0.08)" }}>{t}</span>
+                  <span key={t} className="text-[10px] px-2 py-0.5 rounded-full"
+                    style={{ background: "rgba(139,92,246,0.08)", color: "rgba(196,181,253,0.7)", border: "1px solid rgba(139,92,246,0.18)" }}>{t}</span>
                 ))}
               </div>
 
               <Link href={`/rooms/talkshow/${room.id}`}
                 className="flex items-center justify-center gap-2 py-2.5 rounded-xl font-bold text-sm transition-all active:scale-95"
                 style={{ background: `rgba(139,92,246,0.12)`, border: `1px solid ${ACCENT}40`, color: ACCENT }}>
-                입장하기 →
+                파티 입장 →
               </Link>
             </div>
           ))}

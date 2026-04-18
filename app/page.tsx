@@ -1078,6 +1078,11 @@ function Home() {
               <h2 className="text-2xl sm:text-3xl lg:text-4xl tracking-tight font-medium text-transparent bg-clip-text bg-gradient-to-r from-white via-white/90 to-white/50 drop-shadow-lg">
                 {t.hero.tagline}
               </h2>
+              {t.hero.taglineSub && (
+                <p className="text-xs sm:text-sm text-white/45 max-w-md text-center leading-relaxed">
+                  {t.hero.taglineSub}
+                </p>
+              )}
               <Link href="/rooms/colosseum/room-001"
                 className="relative mt-1 sm:mt-2 px-5 sm:px-8 py-3 sm:py-4 bg-[#FF007F]/10 border border-[#FF007F]/50 rounded-full overflow-hidden transition-all hover:scale-[1.02] active:scale-95 group/btn"
                 style={{ animation: "pulse-glow-pink 3s infinite" }}>
@@ -1088,6 +1093,24 @@ function Home() {
                 </span>
               </Link>
             </div>
+          </section>
+
+          {/* Feature highlights */}
+          <section className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {[
+              { icon: "🎉", title: "자유로운 파티", desc: "최대 50명과 실시간 화상 파티", color: "#00E5FF" },
+              { icon: "🎤", title: "노래방 옵션",   desc: "필요할 때 켜는 온라인 가라오케", color: "#ec4899" },
+              { icon: "🥂", title: "F&B 딜리버리", desc: "파티에 음료와 음식을 배달",     color: "#f59e0b" },
+            ].map(f => (
+              <div key={f.title} className="flex items-center gap-3 px-4 py-3 rounded-xl"
+                style={{ background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                <span className="text-2xl flex-shrink-0">{f.icon}</span>
+                <div className="min-w-0">
+                  <p className="text-xs font-bold" style={{ color: f.color }}>{f.title}</p>
+                  <p className="text-[11px] text-white/40 mt-0.5 truncate">{f.desc}</p>
+                </div>
+              </div>
+            ))}
           </section>
 
           {/* Cards grid */}

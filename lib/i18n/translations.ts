@@ -17,9 +17,10 @@ export const LANG_NAMES: Record<LangCode, string> = {
 const kr = {
   header: { live: "라이브", users: "명", rooms: "룸", profile: "Guest_049", level: "Lv.12" },
   hero: {
-    trending: "지금 트렌딩: 네온 심포니",
-    tagline: "오늘 밤의 주인공은 당신입니다",
-    cta: "지금 가장 핫한 방으로 입장",
+    trending: "지금 트렌딩: 네온 파티",
+    tagline: "당신만의 온라인 파티 공간",
+    taglineSub: "친구들과 실시간으로 파티를 즐기세요. 노래, 게임, 수다 — 모든 것이 하나의 공간에",
+    cta: "파티 시작하기",
   },
   cards: {
     roomKing: {
@@ -146,9 +147,10 @@ const kr = {
 const en = {
   header: { live: "LIVE", users: "Users", rooms: "Rooms", profile: "Guest_049", level: "Lv.12" },
   hero: {
-    trending: "Trending Now: Neon Symphony",
-    tagline: "The Night is Yours to Command.",
-    cta: "JOIN THE HOTTEST ROOM NOW",
+    trending: "Trending Now: Neon Party",
+    tagline: "Your Online Party Space",
+    taglineSub: "Party live with friends. Sing, play, chat — all in one place.",
+    cta: "START A PARTY",
   },
   cards: {
     roomKing: {
@@ -275,9 +277,10 @@ const en = {
 const jp = {
   header: { live: "ライブ", users: "ユーザー", rooms: "ルーム", profile: "Guest_049", level: "Lv.12" },
   hero: {
-    trending: "トレンド中: ネオンシンフォニー",
-    tagline: "今夜はあなたのもの。",
-    cta: "今すぐ最高のルームに入場",
+    trending: "トレンド中: ネオンパーティー",
+    tagline: "あなただけのオンラインパーティー空間",
+    taglineSub: "友達とリアルタイムでパーティーを楽しもう。歌、ゲーム、おしゃべり — 全部ひとつの場所で",
+    cta: "パーティーを始める",
   },
   cards: {
     roomKing: {
@@ -404,9 +407,10 @@ const jp = {
 const cn = {
   header: { live: "直播", users: "用户", rooms: "房间", profile: "Guest_049", level: "Lv.12" },
   hero: {
-    trending: "热门中: 霓虹交响乐",
-    tagline: "今夜，由你掌控。",
-    cta: "立即加入最热门房间",
+    trending: "热门中: 霓虹派对",
+    tagline: "你的专属线上派对空间",
+    taglineSub: "与朋友实时派对。唱歌、游戏、聊天 — 尽在一处",
+    cta: "开始派对",
   },
   cards: {
     roomKing: {

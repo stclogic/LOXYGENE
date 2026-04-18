@@ -18,62 +18,74 @@ const HomeButton = () => (
 const MOCK_ROOMS = [
   {
     id: "room-001",
-    title: "90년대 감성 여행 🎵",
+    title: "90년대 감성 파티 🎵",
     hostName: "별빛가수",
-    singerCount: 3,
+    hostAvatar: "🌟",
+    participantCount: 127,
     viewerCount: 124,
     topGiftAmount: 8400,
-    tags: ["#발라드", "#90년대", "#감성"],
+    tags: ["#파티", "#90년대", "#감성"],
+    vibe: "🎉 신나는",
     isLive: true,
   },
   {
     id: "room-002",
-    title: "K-POP 배틀 시즌 2",
+    title: "K-POP 파티 나이트 🎤",
     hostName: "노래왕자",
-    singerCount: 5,
+    hostAvatar: "👑",
+    participantCount: 89,
     viewerCount: 89,
     topGiftAmount: 5200,
-    tags: ["#KPOP", "#댄스", "#아이돌"],
+    tags: ["#파티", "#KPOP", "#댄스"],
+    vibe: "🔥 열정적",
     isLive: true,
   },
   {
     id: "room-003",
-    title: "트로트 황금시대 🌟",
+    title: "트로트 칵테일파티 🌟",
     hostName: "달빛선율",
-    singerCount: 2,
+    hostAvatar: "🌙",
+    participantCount: 67,
     viewerCount: 67,
     topGiftAmount: 12000,
-    tags: ["#트로트", "#황금시대"],
+    tags: ["#칵테일파티", "#트로트"],
+    vibe: "😊 편안함",
     isLive: true,
   },
   {
     id: "room-004",
-    title: "인디음악 소사이어티",
+    title: "인디 하우스파티 🎸",
     hostName: "가을바람",
-    singerCount: 4,
+    hostAvatar: "🍂",
+    participantCount: 43,
     viewerCount: 43,
     topGiftAmount: 2800,
-    tags: ["#인디", "#어쿠스틱", "#감성"],
+    tags: ["#하우스파티", "#인디", "#감성"],
+    vibe: "😊 편안함",
     isLive: true,
   },
   {
     id: "room-005",
-    title: "재즈 나이트 클럽 🎷",
+    title: "재즈 나이트 파티 🎷",
     hostName: "봄날의꿈",
-    singerCount: 2,
+    hostAvatar: "🌸",
+    participantCount: 31,
     viewerCount: 31,
     topGiftAmount: 6600,
-    tags: ["#재즈", "#라이브"],
+    tags: ["#나이트파티", "#재즈"],
+    vibe: "🎉 신나는",
     isLive: true,
   },
   {
     id: "room-006",
-    title: "힙합 사이퍼 비트",
+    title: "힙합 크루 파티 🔥",
     hostName: "여름밤",
-    singerCount: 6,
+    hostAvatar: "🌊",
+    participantCount: 78,
     viewerCount: 78,
     topGiftAmount: 3100,
-    tags: ["#힙합", "#랩", "#사이퍼"],
+    tags: ["#크루파티", "#힙합", "#사이퍼"],
+    vibe: "🔥 열정적",
     isLive: false,
   },
 ];
@@ -96,7 +108,7 @@ export default function ColosseumLobbyPage() {
     password: "",
   });
 
-  const totalUsers = MOCK_ROOMS.reduce((sum, r) => sum + r.viewerCount + r.singerCount, 0);
+  const totalUsers = MOCK_ROOMS.reduce((sum, r) => sum + r.participantCount, 0);
 
   return (
     <div className="min-h-screen bg-[#070707] relative overflow-hidden">
@@ -181,68 +193,57 @@ export default function ColosseumLobbyPage() {
         {/* Rooms grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {MOCK_ROOMS.map((room) => (
-            <GlassCard key={room.id} className="p-5 flex flex-col gap-4 hover:border-white/10 transition-all duration-300 group">
-              {/* Card header */}
-              <div className="flex items-start justify-between gap-2">
+            <GlassCard key={room.id} className="p-5 flex flex-col gap-3 hover:border-white/10 transition-all duration-300 group">
+              {/* Host + LIVE badge */}
+              <div className="flex items-start gap-3">
+                <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl flex-shrink-0"
+                  style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)" }}>
+                  {room.hostAvatar}
+                </div>
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    {room.isLive && (
-                      <span
-                        className="text-[10px] font-bold px-2 py-0.5 rounded-full"
-                        style={{
-                          background: "rgba(255,50,50,0.2)",
-                          border: "1px solid rgba(255,50,50,0.4)",
-                          color: "#ff5555",
-                        }}
-                      >
-                        LIVE
+                  <div className="flex items-center gap-2 mb-0.5">
+                    {room.isLive ? (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
+                        style={{ background: "rgba(239,68,68,0.2)", border: "1px solid rgba(239,68,68,0.4)", color: "#f87171" }}>
+                        🔴 LIVE
+                      </span>
+                    ) : (
+                      <span className="text-[10px] px-2 py-0.5 rounded-full text-white/25"
+                        style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
+                        예정
                       </span>
                     )}
+                    <span className="text-[10px] text-white/35 truncate">{room.vibe}</span>
                   </div>
-                  <h3 className="text-white font-bold text-base leading-tight group-hover:text-[#00E5FF] transition-colors">
+                  <h3 className="text-white font-bold text-sm leading-tight group-hover:text-[#00E5FF] transition-colors truncate">
                     {room.title}
                   </h3>
-                  <div className="flex items-center gap-1.5 mt-1">
-                    <Icon icon="solar:user-bold" className="text-white/30 w-3.5 h-3.5" />
-                    <span className="text-white/40 text-xs">{room.hostName}</span>
-                  </div>
-                </div>
-
-                {/* Top gift */}
-                <div className="flex-shrink-0 text-right">
-                  <div className="flex items-center gap-1">
-                    <span className="text-xs">💐</span>
-                    <span className="text-[#FF007F] text-xs font-bold">
-                      {room.topGiftAmount.toLocaleString()}
-                    </span>
-                  </div>
+                  <p className="text-white/40 text-xs mt-0.5">호스트 · {room.hostName}</p>
                 </div>
               </div>
 
-              {/* Stats */}
-              <div className="flex items-center gap-4 text-xs text-white/40">
-                <div className="flex items-center gap-1">
-                  <Icon icon="solar:microphone-bold" className="text-[#00E5FF] w-3.5 h-3.5" />
-                  <span className="text-white/60">{room.singerCount}명 노래 중</span>
+              {/* Participant avatar stack + count */}
+              <div className="flex items-center gap-2">
+                <div className="flex -space-x-1.5">
+                  {["👤","😊","🎵"].map((a, i) => (
+                    <div key={i} className="w-6 h-6 rounded-full flex items-center justify-center text-xs"
+                      style={{ background: "rgba(255,255,255,0.08)", border: "1.5px solid rgba(7,7,7,0.9)" }}>
+                      {a}
+                    </div>
+                  ))}
                 </div>
-                <div className="flex items-center gap-1">
-                  <Icon icon="solar:eye-bold" className="w-3.5 h-3.5" />
-                  <span>{room.viewerCount.toLocaleString()}</span>
+                <span className="text-xs text-white/40">+{room.participantCount}명</span>
+                <div className="ml-auto flex items-center gap-1">
+                  <span className="text-[10px]">💐</span>
+                  <span className="text-[#FF007F] text-[10px] font-bold">{room.topGiftAmount.toLocaleString()}</span>
                 </div>
               </div>
 
               {/* Tags */}
-              <div className="flex flex-wrap gap-1.5">
+              <div className="flex flex-wrap gap-1">
                 {room.tags.map((tag) => (
-                  <span
-                    key={tag}
-                    className="text-xs px-2 py-0.5 rounded-full"
-                    style={{
-                      background: "rgba(0,229,255,0.06)",
-                      border: "1px solid rgba(0,229,255,0.12)",
-                      color: "rgba(0,229,255,0.7)",
-                    }}
-                  >
+                  <span key={tag} className="text-[10px] px-2 py-0.5 rounded-full"
+                    style={{ background: "rgba(0,229,255,0.06)", border: "1px solid rgba(0,229,255,0.12)", color: "rgba(0,229,255,0.65)" }}>
                     {tag}
                   </span>
                 ))}
@@ -251,14 +252,10 @@ export default function ColosseumLobbyPage() {
               {/* Action buttons */}
               <div className="flex gap-2 mt-auto pt-1">
                 <Link href={`/rooms/colosseum/${room.id}`} className="flex-1">
-                  <NeonButton variant="cyan" size="sm" fullWidth>
-                    입장
-                  </NeonButton>
+                  <NeonButton variant="cyan" size="sm" fullWidth>파티 입장</NeonButton>
                 </Link>
                 <Link href={`/rooms/colosseum/${room.id}?spectate=true`} className="flex-1">
-                  <NeonButton variant="ghost" size="sm" fullWidth>
-                    관전
-                  </NeonButton>
+                  <NeonButton variant="ghost" size="sm" fullWidth>관전</NeonButton>
                 </Link>
               </div>
             </GlassCard>

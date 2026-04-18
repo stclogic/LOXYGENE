@@ -161,10 +161,20 @@ export function PartyRoomShell({
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState<"audio" | "video" | "eq" | "lighting">("audio");
   const [lightingToastVisible, setLightingToastVisible] = useState(false);
+  const [lightingOn, setLightingOn] = useState(false);
+
+  const toggleLighting = () => {
+    setLightingOn(v => {
+      const next = !v;
+      localStorage.setItem("loxygene-lighting-auto", String(next));
+      return next;
+    });
+  };
 
   // Lighting auto-on preference + toast on mount
   useEffect(() => {
     const autoOn = localStorage.getItem("loxygene-lighting-auto") === "true";
+    setLightingOn(autoOn);
     if (!autoOn) {
       const shown = localStorage.getItem("loxygene-lighting-toast-shown");
       if (!shown) {
@@ -657,6 +667,24 @@ export function PartyRoomShell({
           style={{ background: "rgba(255,0,127,0.1)", border: "1px solid rgba(255,0,127,0.3)" }}
         >
           🎁
+        </button>
+
+        {/* Lighting toggle */}
+        <button
+          onClick={toggleLighting}
+          title="조명 켜기 / 끄기"
+          aria-label="조명 켜기 / 끄기"
+          className="w-12 h-12 rounded-xl flex items-center justify-center transition-all active:scale-90 flex-shrink-0"
+          style={{
+            background: lightingOn ? "rgba(0,229,255,0.2)" : "rgba(255,255,255,0.05)",
+            border: `1px solid ${lightingOn ? "rgba(0,229,255,0.5)" : "rgba(255,255,255,0.1)"}`,
+          }}
+        >
+          <Icon
+            icon={lightingOn ? "solar:lightbulb-bold" : "solar:lightbulb-slash-bold"}
+            className="w-5 h-5"
+            style={{ color: lightingOn ? "#00E5FF" : "rgba(255,255,255,0.35)" }}
+          />
         </button>
 
         {/* Optional panel toggle */}

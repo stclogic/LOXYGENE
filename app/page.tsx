@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { useSession, signOut } from "next-auth/react";
 import Link from "next/link";
 import { Icon } from "@iconify/react";
 import { LanguageProvider, useLanguage } from "@/lib/i18n/LanguageContext";
@@ -573,9 +574,9 @@ function ProfileDropdown({
     setEditingNick(false);
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     try { localStorage.clear(); } catch {}
-    window.location.reload();
+    await signOut({ callbackUrl: "/auth/login" });
   };
 
   const badge =
@@ -793,7 +794,15 @@ function ProfileDropdown({
 // ── Main dashboard ────────────────────────────────────────────
 function Home() {
   const router = useRouter();
+  const { status } = useSession();
   const { t, fading } = useLanguage();
+
+  // Auth guard — redirect to login if unauthenticated
+  useEffect(() => {
+    if (status === "unauthenticated") {
+      router.replace("/auth/login");
+    }
+  }, [status, router]);
 
   // Wallet
   const { wallet, chargeCredits } = useWallet();

@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { Icon } from "@iconify/react";
 import { PartyRoomShell } from "@/components/room/PartyRoomShell";
 import { hasNickname, setUserNickname, randomNickname } from "@/lib/utils/userSession";
+import { useDailyCall } from "@/hooks/useDailyCall";
 
 const MOCK_LYRICS = [
   { text: "사랑했지만 이제는 모두 지나간 일", active: false },
@@ -109,11 +110,30 @@ function KaraokePanelContent() {
 export default function ColosseumRoomPage({ params }: { params: { roomId: string } }) {
   const [nicknameModalOpen, setNicknameModalOpen] = useState(false);
   const [nicknameInput, setNicknameInput] = useState("");
+  const [dailyToken, setDailyToken] = useState("");
+  const [dailyRoomUrl, setDailyRoomUrl] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const { participants: dailyParticipants } = useDailyCall(dailyRoomUrl, dailyToken);
 
   useEffect(() => {
     if (!hasNickname()) setNicknameModalOpen(true);
   }, []);
+
+  useEffect(() => {
+    fetch("/api/rooms/join", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ roomId: params.roomId }),
+    })
+      .then(r => (r.ok ? r.json() : null))
+      .then(data => {
+        if (!data) return;
+        if (data.dailyToken) setDailyToken(data.dailyToken);
+        if (data.dailyRoomUrl) setDailyRoomUrl(data.dailyRoomUrl);
+      })
+      .catch(console.error);
+  }, [params.roomId]);
 
   useEffect(() => {
     if (nicknameModalOpen) setTimeout(() => inputRef.current?.focus(), 50);
@@ -133,9 +153,10 @@ export default function ColosseumRoomPage({ params }: { params: { roomId: string
         roomSubtitle={`룸 ${params.roomId}`}
         backHref="/rooms/colosseum"
         accentColor="#00E5FF"
-        participantCount={127}
+        participantCount={Object.keys(dailyParticipants).length || 127}
         panelTitle="🎤 노래방"
         panelContent={<KaraokePanelContent />}
+        dailyParticipants={dailyParticipants}
       />
 
       {/* Nickname entry modal */}

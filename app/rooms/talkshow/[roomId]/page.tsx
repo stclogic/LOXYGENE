@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Icon } from "@iconify/react";
 import { PartyRoomShell } from "@/components/room/PartyRoomShell";
+import { useDailyCall } from "@/hooks/useDailyCall";
 
 const ACCENT = "#8B5CF6";
 const CURRENT_TOPIC = "요즘 연애가 어려운 이유";
@@ -92,8 +93,29 @@ function TalkPanelContent() {
   );
 }
 
-export default function TalkShowRoomPage({ params: _params }: { params: Promise<{ roomId: string }> }) {
+export default function TalkShowRoomPage({ params }: { params: Promise<{ roomId: string }> }) {
   const [handRaised, setHandRaised] = useState(false);
+  const [dailyToken, setDailyToken] = useState("");
+  const [dailyRoomUrl, setDailyRoomUrl] = useState("");
+
+  const { participants: dailyParticipants } = useDailyCall(dailyRoomUrl, dailyToken);
+
+  useEffect(() => {
+    params.then(({ roomId }) => {
+      fetch("/api/rooms/join", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ roomId }),
+      })
+        .then(r => (r.ok ? r.json() : null))
+        .then(data => {
+          if (!data) return;
+          if (data.dailyToken) setDailyToken(data.dailyToken);
+          if (data.dailyRoomUrl) setDailyRoomUrl(data.dailyRoomUrl);
+        })
+        .catch(console.error);
+    });
+  }, [params]);
 
   const handRaiseBtn = (
     <button
@@ -116,10 +138,11 @@ export default function TalkShowRoomPage({ params: _params }: { params: Promise<
       roomSubtitle="라이브 토크쇼"
       backHref="/rooms/talkshow"
       accentColor={ACCENT}
-      participantCount={34}
+      participantCount={Object.keys(dailyParticipants).length || 34}
       panelTitle="🎙️ 토크 패널"
       panelContent={<TalkPanelContent />}
       extraBarControls={handRaiseBtn}
+      dailyParticipants={dailyParticipants}
     />
   );
 }

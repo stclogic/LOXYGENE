@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Icon } from "@iconify/react";
 import { PartyRoomShell } from "@/components/room/PartyRoomShell";
+import { useDailyCall } from "@/hooks/useDailyCall";
 
 const ACCENT = "#FF8C00";
 
@@ -121,9 +122,27 @@ function GamePanelContent() {
 export default function VarietyRoomPage({ params }: { params: Promise<{ roomId: string }> }) {
   const [buzzerPressed, setBuzzerPressed] = useState(false);
   const paramsRef = useRef<{ roomId: string } | null>(null);
+  const [dailyToken, setDailyToken] = useState("");
+  const [dailyRoomUrl, setDailyRoomUrl] = useState("");
+
+  const { participants: dailyParticipants } = useDailyCall(dailyRoomUrl, dailyToken);
 
   useEffect(() => {
-    params.then(p => { paramsRef.current = p; });
+    params.then(p => {
+      paramsRef.current = p;
+      fetch("/api/rooms/join", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ roomId: p.roomId }),
+      })
+        .then(r => (r.ok ? r.json() : null))
+        .then(data => {
+          if (!data) return;
+          if (data.dailyToken) setDailyToken(data.dailyToken);
+          if (data.dailyRoomUrl) setDailyRoomUrl(data.dailyRoomUrl);
+        })
+        .catch(console.error);
+    });
   }, [params]);
 
   const buzzer = (
@@ -147,10 +166,11 @@ export default function VarietyRoomPage({ params }: { params: Promise<{ roomId: 
       roomSubtitle="방구석 버라이어티"
       backHref="/rooms/variety"
       accentColor={ACCENT}
-      participantCount={48}
+      participantCount={Object.keys(dailyParticipants).length || 48}
       panelTitle="🎮 게임 챌린지"
       panelContent={<GamePanelContent />}
       extraBarControls={buzzer}
+      dailyParticipants={dailyParticipants}
     />
   );
 }

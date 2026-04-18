@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Icon } from "@iconify/react";
 import { PartyRoomShell } from "@/components/room/PartyRoomShell";
+import { useDailyCall } from "@/hooks/useDailyCall";
 
 const ACCENT = "#06b6d4";
 
@@ -138,9 +139,30 @@ function DJPanelContent() {
   );
 }
 
-export default function DJRoomPage({ params: _params }: { params: Promise<{ roomId: string }> }) {
+export default function DJRoomPage({ params }: { params: Promise<{ roomId: string }> }) {
   const [reactions, setReactions] = useState<{ id: number; emoji: string; x: number }[]>([]);
   const reactionIdRef = useRef(0);
+  const [dailyToken, setDailyToken] = useState("");
+  const [dailyRoomUrl, setDailyRoomUrl] = useState("");
+
+  const { participants: dailyParticipants } = useDailyCall(dailyRoomUrl, dailyToken);
+
+  useEffect(() => {
+    params.then(({ roomId }) => {
+      fetch("/api/rooms/join", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ roomId }),
+      })
+        .then(r => (r.ok ? r.json() : null))
+        .then(data => {
+          if (!data) return;
+          if (data.dailyToken) setDailyToken(data.dailyToken);
+          if (data.dailyRoomUrl) setDailyRoomUrl(data.dailyRoomUrl);
+        })
+        .catch(console.error);
+    });
+  }, [params]);
 
   const fireReaction = (emoji: string) => {
     const id = ++reactionIdRef.current;
@@ -171,10 +193,11 @@ export default function DJRoomPage({ params: _params }: { params: Promise<{ room
         roomSubtitle="라이브 DJ 파티"
         backHref="/rooms/dj"
         accentColor={ACCENT}
-        participantCount={89}
+        participantCount={Object.keys(dailyParticipants).length || 89}
         panelTitle="🎵 DJ 부스"
         panelContent={<DJPanelContent />}
         extraBarControls={reactionBtns}
+        dailyParticipants={dailyParticipants}
       />
       <style>{`@keyframes reactionFloat{0%{opacity:1;transform:translateY(0) scale(1)}100%{opacity:0;transform:translateY(-120px) scale(1.5)}}`}</style>
     </>

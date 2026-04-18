@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import type { DailyParticipant } from "@/hooks/useDailyCall";
 import Link from "next/link";
 import { Icon } from "@iconify/react";
 
@@ -31,6 +32,7 @@ interface Props {
   panelTitle?: string;
   panelContent?: React.ReactNode;
   extraBarControls?: React.ReactNode;
+  dailyParticipants?: Record<string, DailyParticipant>;
 }
 
 // ── In-room mini settings components ──────────────────────────────────────
@@ -135,6 +137,28 @@ function InRoomLightingSettings() {
 
 // ──────────────────────────────────────────────────────────────────────────
 
+function VideoTile({ track, name }: { track?: MediaStreamTrack | null; name: string }) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    if (!videoRef.current) return;
+    videoRef.current.srcObject = track ? new MediaStream([track]) : null;
+  }, [track]);
+
+  return (
+    <div className="h-16 relative flex items-center justify-center overflow-hidden">
+      {track ? (
+        <video ref={videoRef} autoPlay muted playsInline className="w-full h-full object-cover" />
+      ) : (
+        <span className="text-2xl">👤</span>
+      )}
+      <span className="absolute bottom-0.5 left-0 right-0 text-[9px] text-white/70 truncate text-center px-1 leading-tight">
+        {name}
+      </span>
+    </div>
+  );
+}
+
 export function PartyRoomShell({
   roomName,
   roomSubtitle,
@@ -144,6 +168,7 @@ export function PartyRoomShell({
   panelTitle = "🎤 노래방",
   panelContent,
   extraBarControls,
+  dailyParticipants,
 }: Props) {
   const [micOn, setMicOn] = useState(false);
   const [camOn, setCamOn] = useState(true);
@@ -199,7 +224,12 @@ export function PartyRoomShell({
   const dragging = useRef(false);
   const dragStart = useRef({ mx: 0, my: 0, px: 0, py: 0 });
 
-  const spotlightedP = MOCK_PARTICIPANTS.find(p => p.id === spotlighted);
+  const hasDailyParticipants = dailyParticipants && Object.keys(dailyParticipants).length > 0;
+  const displayParticipants = hasDailyParticipants ? null : MOCK_PARTICIPANTS;
+  const spotlightedName = spotlighted
+    ? (dailyParticipants?.[spotlighted]?.user_name ?? MOCK_PARTICIPANTS.find(p => p.id === spotlighted)?.name ?? "")
+    : "";
+  const spotlightedP = spotlighted ? { name: spotlightedName } : null;
 
   const startDrag = (e: React.MouseEvent) => {
     if (!panelRef.current) return;
@@ -350,34 +380,61 @@ export function PartyRoomShell({
             style={{ background: "rgba(0,0,0,0.6)", border: "1px solid rgba(255,255,255,0.08)", backdropFilter: "blur(8px)", color: "rgba(255,255,255,0.4)" }}
           >
             <Icon icon={gridCollapsed ? "solar:users-group-two-rounded-bold" : "solar:arrow-right-linear"} className="w-3 h-3" />
-            {gridCollapsed ? `${MOCK_PARTICIPANTS.length}명` : "접기"}
+            {gridCollapsed
+              ? `${hasDailyParticipants ? Object.keys(dailyParticipants!).length : MOCK_PARTICIPANTS.length}명`
+              : "접기"}
           </button>
           {!gridCollapsed && (
             <div className="grid grid-cols-2 gap-1.5" style={{ width: 168 }}>
-              {MOCK_PARTICIPANTS.map(p => (
-                <div
-                  key={p.id}
-                  className="relative rounded-xl overflow-hidden cursor-pointer"
-                  style={{
-                    background: "rgba(255,255,255,0.06)",
-                    border: `1.5px solid ${p.isKaraoke ? "rgba(236,72,153,0.65)" : spotlighted === p.id ? "rgba(0,229,255,0.65)" : "rgba(255,255,255,0.08)"}`,
-                    boxShadow: p.isKaraoke ? "0 0 10px rgba(236,72,153,0.25)" : spotlighted === p.id ? "0 0 10px rgba(0,229,255,0.25)" : "none",
-                  }}
-                  onClick={e => { e.stopPropagation(); setContextMenu({ x: e.clientX, y: e.clientY, pid: p.id }); }}
-                >
-                  <div className="h-16 flex flex-col items-center justify-center gap-1 p-1">
-                    <span className="text-2xl">👤</span>
-                    <span className="text-[9px] text-white/70 truncate w-full text-center px-1 leading-tight">{p.name}</span>
-                  </div>
-                  <div className="absolute bottom-1 right-1 flex items-center gap-0.5">
-                    {p.isKaraoke && <span className="text-[9px] leading-none">🎤</span>}
-                    {p.isPaid
-                      ? <Icon icon={p.isMuted ? "solar:microphone-slash-bold" : "solar:microphone-bold"} className={`w-3 h-3 ${p.isMuted ? "text-white/15" : "text-white/60"}`} />
-                      : <span className="text-[9px]">🔒</span>
-                    }
-                  </div>
-                </div>
-              ))}
+              {hasDailyParticipants
+                ? Object.entries(dailyParticipants!).map(([sid, p]) => (
+                    <div
+                      key={sid}
+                      className="relative rounded-xl overflow-hidden cursor-pointer"
+                      style={{
+                        background: "rgba(255,255,255,0.06)",
+                        border: `1.5px solid ${spotlighted === sid ? "rgba(0,229,255,0.65)" : "rgba(255,255,255,0.08)"}`,
+                        boxShadow: spotlighted === sid ? "0 0 10px rgba(0,229,255,0.25)" : "none",
+                      }}
+                      onClick={e => { e.stopPropagation(); setContextMenu({ x: e.clientX, y: e.clientY, pid: sid }); }}
+                    >
+                      <VideoTile
+                        track={p.tracks?.video?.persistentTrack}
+                        name={p.user_name ?? sid.slice(0, 8)}
+                      />
+                      <div className="absolute bottom-1 right-1 flex items-center gap-0.5">
+                        <Icon
+                          icon={p.tracks?.audio?.state === "off" ? "solar:microphone-slash-bold" : "solar:microphone-bold"}
+                          className={`w-3 h-3 ${p.tracks?.audio?.state === "off" ? "text-white/15" : "text-white/60"}`}
+                        />
+                      </div>
+                    </div>
+                  ))
+                : (displayParticipants ?? MOCK_PARTICIPANTS).map(p => (
+                    <div
+                      key={p.id}
+                      className="relative rounded-xl overflow-hidden cursor-pointer"
+                      style={{
+                        background: "rgba(255,255,255,0.06)",
+                        border: `1.5px solid ${p.isKaraoke ? "rgba(236,72,153,0.65)" : spotlighted === p.id ? "rgba(0,229,255,0.65)" : "rgba(255,255,255,0.08)"}`,
+                        boxShadow: p.isKaraoke ? "0 0 10px rgba(236,72,153,0.25)" : spotlighted === p.id ? "0 0 10px rgba(0,229,255,0.25)" : "none",
+                      }}
+                      onClick={e => { e.stopPropagation(); setContextMenu({ x: e.clientX, y: e.clientY, pid: p.id }); }}
+                    >
+                      <div className="h-16 flex flex-col items-center justify-center gap-1 p-1">
+                        <span className="text-2xl">👤</span>
+                        <span className="text-[9px] text-white/70 truncate w-full text-center px-1 leading-tight">{p.name}</span>
+                      </div>
+                      <div className="absolute bottom-1 right-1 flex items-center gap-0.5">
+                        {p.isKaraoke && <span className="text-[9px] leading-none">🎤</span>}
+                        {p.isPaid
+                          ? <Icon icon={p.isMuted ? "solar:microphone-slash-bold" : "solar:microphone-bold"} className={`w-3 h-3 ${p.isMuted ? "text-white/15" : "text-white/60"}`} />
+                          : <span className="text-[9px]">🔒</span>
+                        }
+                      </div>
+                    </div>
+                  ))
+              }
             </div>
           )}
         </div>

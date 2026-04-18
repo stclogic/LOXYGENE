@@ -187,6 +187,9 @@ export function PartyRoomShell({
   const [settingsTab, setSettingsTab] = useState<"audio" | "video" | "eq" | "lighting">("audio");
   const [lightingToastVisible, setLightingToastVisible] = useState(false);
   const [lightingOn, setLightingOn] = useState(false);
+  const [fnbOpen, setFnbOpen] = useState(false);
+  const [fnbMenu, setFnbMenu] = useState<Record<string, { id: string; name: string; price_coins: number; delivery_minutes: number }[]>>({});
+  const [fnbToast, setFnbToast] = useState("");
 
   const toggleLighting = () => {
     setLightingOn(v => {
@@ -209,6 +212,15 @@ export function PartyRoomShell({
       }
     }
   }, []);
+
+  // F&B menu — lazy fetch on first open
+  useEffect(() => {
+    if (!fnbOpen || Object.keys(fnbMenu).length > 0) return;
+    fetch("/api/fnb/menu")
+      .then(r => r.json())
+      .then(d => setFnbMenu(d.menu ?? {}))
+      .catch(() => {});
+  }, [fnbOpen, fnbMenu]);
 
   // ESC closes settings drawer
   useEffect(() => {
@@ -254,6 +266,7 @@ export function PartyRoomShell({
   };
 
   return (
+    <>
     <div className="fixed inset-0 flex flex-col bg-[#070707] overflow-hidden">
 
       {/* ── FULL-SCREEN HOST STAGE BACKGROUND ── */}
@@ -718,12 +731,15 @@ export function PartyRoomShell({
           <Icon icon="solar:chat-round-bold" className="w-5 h-5" style={{ color: chatOpen ? "#00E5FF" : "rgba(255,255,255,0.4)" }} />
         </button>
 
-        {/* Gift */}
+        {/* F&B Delivery */}
         <button
+          onClick={() => setFnbOpen(true)}
+          aria-label="F&B 딜리버리"
+          title="F&B 딜리버리"
           className="w-12 h-12 rounded-xl flex items-center justify-center text-lg transition-all active:scale-90 flex-shrink-0"
-          style={{ background: "rgba(255,0,127,0.1)", border: "1px solid rgba(255,0,127,0.3)" }}
+          style={{ background: fnbOpen ? "rgba(255,0,127,0.2)" : "rgba(255,0,127,0.1)", border: "1px solid rgba(255,0,127,0.3)" }}
         >
-          🎁
+          🥂
         </button>
 
         {/* Lighting toggle */}
@@ -772,5 +788,78 @@ export function PartyRoomShell({
         </button>
       </div>
     </div>
+
+    {/* ── F&B DELIVERY DRAWER ── */}
+    {fnbOpen && (
+      <>
+        <div className="fixed inset-0 z-40" style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}
+          onClick={() => setFnbOpen(false)} />
+        <div className="fixed left-0 right-0 bottom-0 z-50 flex flex-col rounded-t-2xl overflow-hidden"
+          style={{ height: "65vh", background: "#0a0f1e", borderTop: "1px solid rgba(255,0,127,0.2)" }}>
+          <div className="flex items-center justify-between px-5 py-4 border-b flex-shrink-0"
+            style={{ borderColor: "rgba(255,255,255,0.07)" }}>
+            <div>
+              <p className="text-white font-bold">🥂 F&B 딜리버리</p>
+              <p className="text-[11px] text-white/30 mt-0.5">코인으로 음료·음식을 주문하세요</p>
+            </div>
+            <button type="button" aria-label="닫기" onClick={() => setFnbOpen(false)} className="text-white/30 hover:text-white/60 transition-colors">
+              <Icon icon="solar:close-circle-bold" className="w-5 h-5" />
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-4" style={{ scrollbarWidth: "none" }}>
+            {Object.keys(fnbMenu).length === 0 && (
+              <div className="text-center py-8 text-white/25 text-sm">메뉴 불러오는 중...</div>
+            )}
+            {Object.entries(fnbMenu).map(([cat, items]) => (
+              <div key={cat}>
+                <p className="text-[10px] font-bold tracking-widest text-white/30 mb-2">
+                  {cat === "premium" ? "🥂 PREMIUM" : cat === "drinks" ? "🍸 DRINKS" : "🍽️ FOOD"}
+                </p>
+                <div className="flex flex-col gap-2">
+                  {items.map(item => (
+                    <div key={item.id} className="flex items-center gap-3 p-3 rounded-xl"
+                      style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-white/90 truncate">{item.name}</p>
+                        <p className="text-[11px] font-bold mt-0.5" style={{ color: "#FFD700" }}>
+                          {item.price_coins.toLocaleString()} O₂ · {item.delivery_minutes}분
+                        </p>
+                      </div>
+                      <button type="button"
+                        onClick={async () => {
+                          const res = await fetch("/api/fnb/order", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ itemId: item.id, quantity: 1 }),
+                          }).then(r => r.json()).catch(() => null);
+                          setFnbOpen(false);
+                          const msg = res?.orderId
+                            ? `🥂 주문이 접수됐어요! ${item.delivery_minutes}분 후 도착`
+                            : "❌ 주문 실패. 코인 잔액을 확인하세요.";
+                          setFnbToast(msg);
+                          setTimeout(() => setFnbToast(""), 4000);
+                        }}
+                        className="flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold transition-all active:scale-95"
+                        style={{ background: "rgba(255,0,127,0.12)", border: "1px solid rgba(255,0,127,0.3)", color: "#FF007F" }}>
+                        주문
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </>
+    )}
+
+    {/* F&B floating toast */}
+    {fnbToast && (
+      <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[60] px-5 py-3 rounded-2xl text-sm font-medium text-white whitespace-nowrap pointer-events-none"
+        style={{ background: "rgba(0,0,0,0.9)", border: "1px solid rgba(255,0,127,0.3)", backdropFilter: "blur(20px)", boxShadow: "0 8px 32px rgba(0,0,0,0.5)" }}>
+        {fnbToast}
+      </div>
+    )}
+    </>
   );
 }

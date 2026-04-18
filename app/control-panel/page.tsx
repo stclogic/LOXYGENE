@@ -8,7 +8,7 @@ import { Icon } from "@iconify/react";
 // Shared primitives
 // ─────────────────────────────────────────────────────────────
 
-type Tab = "audio" | "video" | "eq" | "lighting" | "display" | "diagnostics" | "updates" | "theme";
+type Tab = "audio" | "video" | "eq" | "lighting" | "display" | "diagnostics" | "updates" | "theme" | "fnb";
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
@@ -1328,6 +1328,220 @@ function ThemeTab() {
 }
 
 // ─────────────────────────────────────────────────────────────
+// F&B Delivery Tab
+// ─────────────────────────────────────────────────────────────
+
+interface FnbItem {
+  id: string;
+  name: string;
+  description: string | null;
+  price_coins: number;
+  category: "drinks" | "food" | "premium";
+  delivery_minutes: number;
+}
+
+const CATEGORY_LABELS: Record<string, string> = {
+  premium: "🥂 프리미엄",
+  drinks: "🍸 음료",
+  food: "🍽️ 푸드",
+};
+
+function FnBTab() {
+  const [menu, setMenu] = useState<Record<string, FnbItem[]>>({});
+  const [loading, setLoading] = useState(true);
+  const [coinBalance, setCoinBalance] = useState<number | null>(null);
+  const [selected, setSelected] = useState<FnbItem | null>(null);
+  const [qty, setQty] = useState(1);
+  const [ordering, setOrdering] = useState(false);
+  const [toast, setToast] = useState("");
+  const [orderError, setOrderError] = useState("");
+
+  useEffect(() => {
+    Promise.all([
+      fetch("/api/fnb/menu").then(r => r.json()),
+      fetch("/api/user/balance").then(r => r.json()).catch(() => ({ coins: null })),
+    ]).then(([menuData, balData]) => {
+      setMenu(menuData.menu ?? {});
+      setCoinBalance(balData.coins ?? 24500);
+    }).finally(() => setLoading(false));
+  }, []);
+
+  const openModal = (item: FnbItem) => {
+    setSelected(item);
+    setQty(1);
+    setOrderError("");
+  };
+
+  const closeModal = () => {
+    setSelected(null);
+    setOrderError("");
+  };
+
+  const totalCoins = (selected?.price_coins ?? 0) * qty;
+  const hasEnough = coinBalance !== null ? coinBalance >= totalCoins : true;
+
+  const placeOrder = async () => {
+    if (!selected) return;
+    setOrdering(true);
+    setOrderError("");
+    try {
+      const res = await fetch("/api/fnb/order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ itemId: selected.id, quantity: qty }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        if (data.error === "insufficient_coins") {
+          setOrderError("코인이 부족해요.");
+        } else {
+          setOrderError(data.error ?? "주문 실패");
+        }
+        return;
+      }
+      if (data.newBalance !== undefined) setCoinBalance(data.newBalance);
+      closeModal();
+      const msg = `주문 완료! 약 ${selected.delivery_minutes}분 후 도착 예정 🥂`;
+      setToast(msg);
+      setTimeout(() => setToast(""), 4000);
+    } finally {
+      setOrdering(false);
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-5">
+      {/* Balance strip */}
+      <div className="flex items-center justify-between px-5 py-3.5 rounded-2xl"
+        style={{ background: "rgba(255,215,0,0.05)", border: "1px solid rgba(255,215,0,0.15)" }}>
+        <div>
+          <p className="text-[10px] text-white/30 tracking-widest">내 코인 잔액</p>
+          <p className="text-xl font-black" style={{ color: "#FFD700" }}>
+            {coinBalance !== null ? coinBalance.toLocaleString() : "—"} <span className="text-sm font-normal text-white/40">O₂</span>
+          </p>
+        </div>
+        <Link href="/payments/charge"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all"
+          style={{ background: "rgba(0,229,255,0.1)", border: "1px solid rgba(0,229,255,0.3)", color: "#00E5FF" }}>
+          <Icon icon="solar:add-circle-bold" className="w-3.5 h-3.5" />
+          충전
+        </Link>
+      </div>
+
+      {loading && (
+        <div className="text-center py-16 text-white/25 text-sm">메뉴 불러오는 중...</div>
+      )}
+
+      {!loading && Object.entries(menu).map(([cat, items]) => (
+        <Card key={cat}>
+          <SectionTitle>{CATEGORY_LABELS[cat] ?? cat}</SectionTitle>
+          <div className="flex flex-col gap-3">
+            {items.map(item => (
+              <div key={item.id} className="flex items-center gap-3 py-3 border-b last:border-0"
+                style={{ borderColor: "rgba(255,255,255,0.05)" }}>
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 text-lg"
+                  style={{ background: cat === "premium" ? "rgba(255,215,0,0.1)" : cat === "drinks" ? "rgba(0,229,255,0.08)" : "rgba(255,140,0,0.08)", border: "1px solid rgba(255,255,255,0.07)" }}>
+                  {cat === "premium" ? "🥂" : cat === "drinks" ? "🍸" : "🍽️"}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-white/90 truncate">{item.name}</p>
+                  <p className="text-[11px] text-white/35 truncate">{item.description}</p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="text-xs font-black" style={{ color: "#FFD700" }}>{item.price_coins.toLocaleString()} O₂</span>
+                    <span className="text-[10px] text-white/25">· {item.delivery_minutes}분 배달</span>
+                  </div>
+                </div>
+                <button onClick={() => openModal(item)}
+                  className="flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold transition-all active:scale-95"
+                  style={{ background: "rgba(255,0,127,0.12)", border: "1px solid rgba(255,0,127,0.3)", color: "#FF007F" }}>
+                  주문하기
+                </button>
+              </div>
+            ))}
+          </div>
+        </Card>
+      ))}
+
+      {/* Toast */}
+      {toast && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] px-5 py-3 rounded-2xl text-sm font-medium text-white max-w-xs text-center"
+          style={{ background: "rgba(0,0,0,0.9)", border: "1px solid rgba(0,229,255,0.3)", boxShadow: "0 8px 32px rgba(0,0,0,0.5)", backdropFilter: "blur(20px)" }}>
+          {toast}
+        </div>
+      )}
+
+      {/* Order confirmation modal */}
+      {selected && (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center p-4"
+          style={{ background: "rgba(0,0,0,0.8)", backdropFilter: "blur(8px)" }}
+          onClick={e => e.target === e.currentTarget && closeModal()}>
+          <div className="w-full max-w-sm rounded-2xl p-6 flex flex-col gap-4"
+            style={{ background: "rgba(8,8,20,0.99)", border: "1px solid rgba(255,255,255,0.1)", boxShadow: "0 24px 64px rgba(0,0,0,0.7)" }}>
+            <div className="flex items-start justify-between">
+              <div>
+                <h3 className="text-white font-bold text-base">{selected.name}</h3>
+                <p className="text-[11px] text-white/40 mt-0.5">{selected.delivery_minutes}분 배달 예정</p>
+              </div>
+              <button type="button" aria-label="닫기" onClick={closeModal} className="text-white/30 hover:text-white/60 transition-colors">
+                <Icon icon="solar:close-circle-bold" className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Quantity selector */}
+            <div className="flex items-center justify-between py-3 border-y" style={{ borderColor: "rgba(255,255,255,0.07)" }}>
+              <span className="text-sm text-white/60">수량</span>
+              <div className="flex items-center gap-3">
+                <button onClick={() => setQty(q => Math.max(1, q - 1))}
+                  className="w-8 h-8 rounded-lg flex items-center justify-center text-white/60 hover:text-white transition-colors"
+                  style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)" }}>−</button>
+                <span className="text-white font-bold w-6 text-center">{qty}</span>
+                <button onClick={() => setQty(q => Math.min(10, q + 1))}
+                  className="w-8 h-8 rounded-lg flex items-center justify-center text-white/60 hover:text-white transition-colors"
+                  style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)" }}>+</button>
+              </div>
+            </div>
+
+            {/* Price summary */}
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-white/60">합계</span>
+              <span className="text-lg font-black" style={{ color: "#FFD700" }}>{totalCoins.toLocaleString()} O₂</span>
+            </div>
+            <div className="flex items-center justify-between -mt-2">
+              <span className="text-xs text-white/30">현재 잔액</span>
+              <span className="text-xs" style={{ color: hasEnough ? "rgba(255,255,255,0.4)" : "#ef4444" }}>
+                {coinBalance?.toLocaleString() ?? "—"} O₂
+              </span>
+            </div>
+
+            {orderError && (
+              <div className="rounded-xl p-3 text-sm" style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.25)", color: "#f87171" }}>
+                {orderError}&nbsp;
+                {orderError.includes("부족") && (
+                  <Link href="/payments/charge" className="underline font-semibold text-[#00E5FF]" onClick={closeModal}>충전하러 가기</Link>
+                )}
+              </div>
+            )}
+
+            <button onClick={placeOrder} disabled={ordering || !hasEnough}
+              className="w-full py-3 rounded-xl font-bold text-sm transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{ background: hasEnough ? "rgba(255,0,127,0.15)" : "rgba(255,255,255,0.04)", border: `1px solid ${hasEnough ? "rgba(255,0,127,0.4)" : "rgba(255,255,255,0.1)"}`, color: hasEnough ? "#FF007F" : "rgba(255,255,255,0.3)" }}>
+              {ordering ? "주문 중..." : hasEnough ? `주문하기 (${totalCoins.toLocaleString()} O₂)` : "코인 부족"}
+            </button>
+
+            {!hasEnough && (
+              <Link href="/payments/charge" onClick={closeModal}
+                className="text-center text-xs text-[#00E5FF] underline">
+                코인 충전하러 가기
+              </Link>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
 // Main Page
 // ─────────────────────────────────────────────────────────────
 
@@ -1340,6 +1554,7 @@ const TABS: { id: Tab; icon: string; label: string }[] = [
   { id: "diagnostics", icon: "🔧", label: "시스템 진단" },
   { id: "updates",     icon: "📦", label: "업데이트 센터" },
   { id: "theme",       icon: "🎨", label: "테마 커스텀" },
+  { id: "fnb",         icon: "🥂", label: "F&B 딜리버리" },
 ];
 
 export default function ControlPanelPage() {
@@ -1357,6 +1572,7 @@ export default function ControlPanelPage() {
       case "diagnostics": return <DiagnosticsTab />;
       case "updates":     return <UpdatesTab />;
       case "theme":       return <ThemeTab />;
+      case "fnb":         return <FnBTab />;
     }
   };
 

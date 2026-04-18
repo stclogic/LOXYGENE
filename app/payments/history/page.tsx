@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Icon } from "@iconify/react";
 
@@ -9,6 +9,26 @@ const GOLD = "#FFD700";
 const SUCCESS = "#22C55E";
 const DANGER = "#EF4444";
 const WARN = "#F59E0B";
+const PINK = "#FF007F";
+
+type ViewMode = "transactions" | "fnb";
+
+interface FnbOrder {
+  id: string;
+  item_name: string;
+  quantity: number;
+  total_coins: number;
+  status: "pending" | "confirmed" | "delivering" | "delivered" | "cancelled";
+  created_at: string;
+}
+
+const STATUS_LABEL: Record<string, { label: string; color: string }> = {
+  pending: { label: "대기중", color: WARN },
+  confirmed: { label: "확인됨", color: ACCENT },
+  delivering: { label: "배달중", color: "#8B5CF6" },
+  delivered: { label: "완료", color: SUCCESS },
+  cancelled: { label: "취소됨", color: DANGER },
+};
 
 type TxType = "charge" | "spend" | "earn" | "refund";
 type Period = "전체" | "이번달" | "지난달" | "3개월";
@@ -75,6 +95,19 @@ export default function PaymentHistoryPage() {
   const [filterType, setFilterType] = useState<"전체" | TxType>("전체");
   const [period, setPeriod] = useState<Period>("이번달");
   const [currentBalance] = useState(62400);
+  const [viewMode, setViewMode] = useState<ViewMode>("transactions");
+  const [fnbOrders, setFnbOrders] = useState<FnbOrder[]>([]);
+  const [fnbLoading, setFnbLoading] = useState(false);
+
+  useEffect(() => {
+    if (viewMode !== "fnb") return;
+    setFnbLoading(true);
+    fetch("/api/fnb/orders")
+      .then(r => r.json())
+      .then(d => setFnbOrders(d.orders ?? []))
+      .catch(() => {})
+      .finally(() => setFnbLoading(false));
+  }, [viewMode]);
 
   const filtered = MOCK_HISTORY.filter(tx => {
     const matchType = filterType === "전체" || tx.type === filterType;
@@ -125,6 +158,58 @@ export default function PaymentHistoryPage() {
       </header>
 
       <div className="max-w-2xl mx-auto px-4 pt-6 pb-20">
+
+        {/* View mode toggle */}
+        <div className="flex gap-2 mb-5 p-1 rounded-xl" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
+          {([["transactions", "💳 결제 내역"], ["fnb", "🥂 F&B 주문"]] as [ViewMode, string][]).map(([mode, label]) => (
+            <button key={mode} type="button" onClick={() => setViewMode(mode)}
+              className="flex-1 py-2 rounded-lg text-xs font-bold transition-all"
+              style={viewMode === mode
+                ? { background: mode === "fnb" ? `${PINK}18` : `${ACCENT}15`, border: `1px solid ${mode === "fnb" ? PINK : ACCENT}40`, color: mode === "fnb" ? PINK : ACCENT }
+                : { color: "rgba(255,255,255,0.35)" }}>
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {/* F&B Orders view */}
+        {viewMode === "fnb" && (
+          <div className="flex flex-col gap-3">
+            {fnbLoading && (
+              <div className="text-center py-12 text-white/25 text-sm">주문 내역 불러오는 중...</div>
+            )}
+            {!fnbLoading && fnbOrders.length === 0 && (
+              <div className="text-center py-12 text-white/20 text-sm">F&B 주문 내역이 없습니다</div>
+            )}
+            {fnbOrders.map(order => {
+              const st = STATUS_LABEL[order.status] ?? { label: order.status, color: "rgba(255,255,255,0.4)" };
+              return (
+                <div key={order.id} className="flex items-center gap-3 p-4 rounded-2xl"
+                  style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl flex-shrink-0"
+                    style={{ background: `${PINK}10`, border: `1px solid ${PINK}20` }}>🥂</div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-white/85 truncate">{order.item_name}</p>
+                    <p className="text-[11px] text-white/35 mt-0.5">
+                      {order.quantity}개 · {new Date(order.created_at).toLocaleString("ko-KR", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                    </p>
+                  </div>
+                  <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                    <span className="text-sm font-black tabular-nums" style={{ color: GOLD }}>
+                      -{order.total_coins.toLocaleString()} O₂
+                    </span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full font-bold"
+                      style={{ background: `${st.color}15`, border: `1px solid ${st.color}30`, color: st.color }}>
+                      {st.label}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {viewMode === "transactions" && (<>
         {/* Balance card */}
         <div className="rounded-2xl p-6 mb-6 flex flex-col gap-1"
           style={{ background: `linear-gradient(135deg, rgba(0,229,255,0.08), rgba(0,229,255,0.02))`, border: `1px solid ${ACCENT}25` }}>
@@ -194,6 +279,7 @@ export default function PaymentHistoryPage() {
             </div>
           ))}
         </div>
+        </>)}
       </div>
 
       <style>{`

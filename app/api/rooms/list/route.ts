@@ -20,11 +20,7 @@ export async function GET(req: NextRequest) {
 
     let query = supabase
       .from('rooms')
-      .select(`
-        *,
-        host:users!rooms_host_id_fkey(nickname, avatar_url),
-        participants:room_participants(count)
-      `)
+      .select('*, participants:room_participants(count)')
       .in('status', ['waiting', 'live'])
       .is('ended_at', null)
       .order('created_at', { ascending: false })
@@ -37,7 +33,18 @@ export async function GET(req: NextRequest) {
 
     if (error) {
       console.error('Room list error:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      // Fallback: try without the participants join
+      const { data: plain, error: plainError } = await supabase
+        .from('rooms')
+        .select('*')
+        .in('status', ['waiting', 'live'])
+        .is('ended_at', null)
+        .order('created_at', { ascending: false })
+      if (plainError) {
+        console.error('Room list fallback error:', plainError)
+        return NextResponse.json({ error: plainError.message }, { status: 500 })
+      }
+      return NextResponse.json({ rooms: plain || [] })
     }
 
     return NextResponse.json({ rooms: data || [] })

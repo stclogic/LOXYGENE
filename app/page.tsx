@@ -13,6 +13,7 @@ import { getUserNickname, setUserNickname, getUserMembership } from "@/lib/utils
 import dynamic from "next/dynamic";
 
 const ChargeModal = dynamic(() => import("@/components/ui/ChargeModal"), { ssr: false });
+import { LoxygeneCarousel } from "@/components/ui/LoxygeneCarousel";
 
 // ── Mock data ─────────────────────────────────────────────────
 const MOCK_ROOMS = [
@@ -1273,6 +1274,9 @@ function Home() {
                 )}
               </div>
             </div>
+
+            {/* Card F: Smart Rolling Carousel */}
+            <LoxygeneCarousel />
 
             {/* Card E: Vibe Director */}
             <div className="group relative bg-white/[0.02] border border-white/5 hover:border-[#FF007F]/30 hover:bg-[#FF007F]/[0.02] rounded-xl p-5 lg:p-6 flex flex-col gap-4 backdrop-blur-xl transition-all duration-300 overflow-hidden cursor-pointer">

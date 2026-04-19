@@ -20,9 +20,77 @@ const MOCK_QUEUE = [
   { id: "q4", nickname: "하늘별", songTitle: "그녀가 처음 울던 날", position: 4 },
 ];
 
-function KaraokePanelContent() {
+function extractYouTubeId(url: string): string | null {
+  const m = url.match(/(?:youtube\.com\/(?:watch\?(?:.*&)?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+  return m?.[1] ?? (url.match(/^[a-zA-Z0-9_-]{11}$/) ? url : null);
+}
+
+function KaraokePanelContent({ onVideoChange }: { onVideoChange: (id: string | null) => void }) {
+  const [urlInput, setUrlInput] = useState("");
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [error, setError] = useState(false);
+
+  const handleLoad = () => {
+    const id = extractYouTubeId(urlInput.trim());
+    if (id) {
+      setActiveId(id);
+      onVideoChange(id);
+      setError(false);
+    } else {
+      setError(true);
+    }
+  };
+
+  const handleClear = () => {
+    setActiveId(null);
+    setUrlInput("");
+    setError(false);
+    onVideoChange(null);
+  };
+
   return (
     <div className="flex flex-col gap-4 p-4">
+      {/* YouTube URL input */}
+      <div>
+        <p className="text-[10px] text-white/30 tracking-widest font-medium mb-2">유튜브 영상</p>
+        <div className="flex gap-2">
+          <input
+            value={urlInput}
+            onChange={e => { setUrlInput(e.target.value); setError(false); }}
+            onKeyDown={e => { if (e.key === "Enter") handleLoad(); }}
+            placeholder="YouTube URL 또는 영상 ID"
+            className="flex-1 min-w-0 px-3 py-2 rounded-lg text-xs text-white outline-none placeholder-white/20"
+            style={{ background: "rgba(255,255,255,0.05)", border: `1px solid ${error ? "rgba(239,68,68,0.5)" : "rgba(255,255,255,0.1)"}` }}
+          />
+          {activeId ? (
+            <button
+              type="button"
+              onClick={handleClear}
+              className="flex-shrink-0 px-3 py-2 rounded-lg text-xs font-medium transition-all"
+              style={{ background: "rgba(239,68,68,0.15)", border: "1px solid rgba(239,68,68,0.3)", color: "#ef4444" }}
+            >
+              중지
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={handleLoad}
+              className="flex-shrink-0 px-3 py-2 rounded-lg text-xs font-medium transition-all"
+              style={{ background: "rgba(0,229,255,0.12)", border: "1px solid rgba(0,229,255,0.3)", color: "#00E5FF" }}
+            >
+              재생
+            </button>
+          )}
+        </div>
+        {error && <p className="text-[10px] text-red-400 mt-1">올바른 YouTube URL을 입력해주세요.</p>}
+        {activeId && (
+          <div className="flex items-center gap-2 mt-2 px-2 py-1.5 rounded-lg" style={{ background: "rgba(0,229,255,0.06)", border: "1px solid rgba(0,229,255,0.15)" }}>
+            <span className="w-1.5 h-1.5 rounded-full bg-[#00E5FF] animate-pulse block flex-shrink-0" />
+            <span className="text-[10px] text-[#00E5FF] truncate">재생 중: {activeId}</span>
+          </div>
+        )}
+      </div>
+
       {/* Now playing */}
       <div>
         <p className="text-[10px] text-white/30 tracking-widest font-medium mb-2">NOW PLAYING</p>
@@ -112,6 +180,7 @@ export default function ColosseumRoomPage({ params }: { params: { roomId: string
   const [nicknameInput, setNicknameInput] = useState("");
   const [dailyToken, setDailyToken] = useState("");
   const [dailyRoomUrl, setDailyRoomUrl] = useState("");
+  const [karaokeVideoId, setKaraokeVideoId] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const { participants: dailyParticipants } = useDailyCall(dailyRoomUrl, dailyToken);
@@ -155,7 +224,8 @@ export default function ColosseumRoomPage({ params }: { params: { roomId: string
         accentColor="#00E5FF"
         participantCount={Object.keys(dailyParticipants).length || 127}
         panelTitle="🎤 노래방"
-        panelContent={<KaraokePanelContent />}
+        panelContent={<KaraokePanelContent onVideoChange={id => setKaraokeVideoId(id)} />}
+        karaokeVideoId={karaokeVideoId ?? undefined}
         dailyParticipants={dailyParticipants}
       />
 

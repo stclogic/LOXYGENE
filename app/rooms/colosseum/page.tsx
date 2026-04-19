@@ -113,12 +113,31 @@ export default function ColosseumLobbyPage() {
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState("");
 
-  useEffect(() => {
+  const refreshRooms = () => {
     fetch("/api/rooms/list?type=colosseum")
       .then((r) => r.json())
-      .then((data) => { if (data.rooms?.length) setRooms(data.rooms); })
-      .catch((err) => console.error("Failed to load rooms:", err));
-  }, []);
+      .then((data) => {
+        if (!Array.isArray(data.rooms)) return;
+        if (data.rooms.length === 0) { setRooms([]); return; }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const normalized = data.rooms.map((r: any) => ({
+          id: r.id,
+          title: r.title ?? "무제",
+          hostName: r.host?.nickname ?? r.host_id?.slice(0, 8) ?? "호스트",
+          hostAvatar: r.host?.avatar_url ?? "🎤",
+          participantCount: r.participants?.[0]?.count ?? 0,
+          viewerCount: r.participants?.[0]?.count ?? 0,
+          topGiftAmount: 0,
+          tags: r.tags ?? [],
+          vibe: "🎉 파티",
+          isLive: r.status === "live",
+        }));
+        setRooms(normalized);
+      })
+      .catch(() => {});
+  };
+
+  useEffect(() => { refreshRooms(); }, []);
 
   const handleCreateRoom = async () => {
     if (!form.title.trim()) return;
@@ -233,7 +252,12 @@ export default function ColosseumLobbyPage() {
 
         {/* Rooms grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {MOCK_ROOMS.map((room) => (
+          {rooms.length === 0 && (
+            <div className="col-span-full text-center py-16 text-white/25 text-sm">
+              아직 열린 방이 없어요. 첫 번째 방을 만들어보세요! 🎤
+            </div>
+          )}
+          {rooms.map((room) => (
             <GlassCard key={room.id} className="p-5 flex flex-col gap-3 hover:border-white/10 transition-all duration-300 group">
               {/* Host + LIVE badge */}
               <div className="flex items-start gap-3">

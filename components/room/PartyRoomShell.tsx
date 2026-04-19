@@ -33,6 +33,7 @@ interface Props {
   panelContent?: React.ReactNode;
   extraBarControls?: React.ReactNode;
   dailyParticipants?: Record<string, DailyParticipant>;
+  karaokeVideoId?: string;
 }
 
 // ── In-room mini settings components ──────────────────────────────────────
@@ -61,13 +62,33 @@ function MiniToggle({ checked, onChange, label = "토글" }: { checked: boolean;
 }
 
 function MiniSlider({ value, onChange, min = 0, max = 100, label = "슬라이더" }: { value: number; onChange: (v: number) => void; min?: number; max?: number; label?: string }) {
+  const step = Math.round((max - min) / 20) || 1;
+  const dec = () => onChange(Math.max(min, value - step));
+  const inc = () => onChange(Math.min(max, value + step));
+  const pct = ((value - min) / (max - min)) * 100;
   return (
-    <input
-      type="range" min={min} max={max} value={value}
-      aria-label={label}
-      onChange={e => onChange(Number(e.target.value))}
-      className="w-32 accent-cyan-400"
-    />
+    <div className="flex items-center gap-2" aria-label={label}>
+      <button
+        type="button"
+        aria-label={`${label} 줄이기`}
+        onClick={dec}
+        className="w-6 h-6 rounded-md flex items-center justify-center text-white/60 hover:text-white transition-colors flex-shrink-0 bg-white/[0.08] border border-white/10"
+      >
+        <Icon icon="solar:minus-bold" className="w-3 h-3" />
+      </button>
+      <div className="relative w-20 h-1.5 rounded-full flex-shrink-0 bg-white/10">
+        <div className="absolute inset-y-0 left-0 rounded-full bg-cyan-500" style={{ width: `${pct}%` }} />
+      </div>
+      <button
+        type="button"
+        aria-label={`${label} 높이기`}
+        onClick={inc}
+        className="w-6 h-6 rounded-md flex items-center justify-center text-white/60 hover:text-white transition-colors flex-shrink-0 bg-white/[0.08] border border-white/10"
+      >
+        <Icon icon="solar:add-bold" className="w-3 h-3" />
+      </button>
+      <span className="text-xs text-white/40 w-7 text-right tabular-nums flex-shrink-0">{value}</span>
+    </div>
   );
 }
 
@@ -169,6 +190,7 @@ export function PartyRoomShell({
   panelContent,
   extraBarControls,
   dailyParticipants,
+  karaokeVideoId,
 }: Props) {
   const [micOn, setMicOn] = useState(false);
   const [camOn, setCamOn] = useState(true);
@@ -185,11 +207,68 @@ export function PartyRoomShell({
   const [karaokeOn, setKaraokeOn] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState<"audio" | "video" | "eq" | "lighting">("audio");
+  const settingsHistoryPushed = useRef(false);
+
+  const closeSettings = () => {
+    if (settingsHistoryPushed.current) {
+      settingsHistoryPushed.current = false;
+      history.back(); // popstate handler will call setSettingsOpen(false)
+    } else {
+      setSettingsOpen(false);
+    }
+  };
   const [lightingToastVisible, setLightingToastVisible] = useState(false);
   const [lightingOn, setLightingOn] = useState(false);
   const [fnbOpen, setFnbOpen] = useState(false);
   const [fnbMenu, setFnbMenu] = useState<Record<string, { id: string; name: string; price_coins: number; delivery_minutes: number }[]>>({});
   const [fnbToast, setFnbToast] = useState("");
+
+  // Camera background mode
+  const [bgMode, setBgMode] = useState<"gradient" | "camera">("gradient");
+  const [hostStream, setHostStream] = useState<MediaStream | null>(null);
+  const hostVideoRef = useRef<HTMLVideoElement>(null);
+  const [hiddenParticipants, setHiddenParticipants] = useState<Set<string>>(new Set());
+
+  // Chat input
+  const [chatInput, setChatInput] = useState("");
+
+  const activateCameraBg = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+      setHostStream(prev => { prev?.getTracks().forEach(t => t.stop()); return stream; });
+      setBgMode("camera");
+    } catch {
+      // permission denied — stay on gradient
+    }
+    setBgPickerOpen(false);
+  };
+
+  const deactivateCameraBg = () => {
+    hostStream?.getTracks().forEach(t => t.stop());
+    setHostStream(null);
+    setBgMode("gradient");
+  };
+
+  const toggleParticipantVisibility = (pid: string) => {
+    setHiddenParticipants(prev => {
+      const next = new Set(prev);
+      next.has(pid) ? next.delete(pid) : next.add(pid);
+      return next;
+    });
+  };
+
+  // Wire host camera stream to video element
+  useEffect(() => {
+    if (hostVideoRef.current && hostStream) {
+      hostVideoRef.current.srcObject = hostStream;
+    }
+  }, [hostStream]);
+
+  // Stop camera stream when component unmounts
+  useEffect(() => {
+    return () => { hostStream?.getTracks().forEach(t => t.stop()); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const toggleLighting = () => {
     setLightingOn(v => {
@@ -222,12 +301,26 @@ export function PartyRoomShell({
       .catch(() => {});
   }, [fnbOpen, fnbMenu]);
 
-  // ESC closes settings drawer
+  // ESC + back-navigation closes settings drawer (keeps user in room)
   useEffect(() => {
-    const handleEsc = (e: KeyboardEvent) => { if (e.key === "Escape") setSettingsOpen(false); };
+    const handleEsc = (e: KeyboardEvent) => { if (e.key === "Escape") closeSettings(); };
     window.addEventListener("keydown", handleEsc);
     return () => window.removeEventListener("keydown", handleEsc);
   }, []);
+
+  useEffect(() => {
+    if (settingsOpen) {
+      // Push a history entry so browser back closes the drawer instead of leaving the room
+      history.pushState({ settingsOpen: true }, "");
+      settingsHistoryPushed.current = true;
+    }
+    const handlePop = () => {
+      settingsHistoryPushed.current = false;
+      setSettingsOpen(false);
+    };
+    window.addEventListener("popstate", handlePop);
+    return () => window.removeEventListener("popstate", handlePop);
+  }, [settingsOpen]);
 
   // Panel drag state
   const panelRef = useRef<HTMLDivElement>(null);
@@ -271,16 +364,38 @@ export function PartyRoomShell({
 
       {/* ── FULL-SCREEN HOST STAGE BACKGROUND ── */}
       <div className="absolute inset-0 z-0">
-        <div
-          className="absolute inset-0"
-          style={{ background: `linear-gradient(135deg, ${selectedBg.from}, ${selectedBg.via}, ${selectedBg.to})` }}
-        />
-        {/* Mock camera silhouette */}
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none">
-          <span className="text-[18vw] opacity-[0.04]">{spotlightedP ? "👤" : "🎙️"}</span>
-        </div>
-        {/* Vignette */}
-        <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse at center, transparent 25%, rgba(0,0,0,0.8) 100%)" }} />
+        {bgMode === "camera" && hostStream ? (
+          <video ref={hostVideoRef} autoPlay muted playsInline className="absolute inset-0 w-full h-full object-cover" />
+        ) : (
+          <div
+            className="absolute inset-0"
+            style={{ background: `linear-gradient(135deg, ${selectedBg.from}, ${selectedBg.via}, ${selectedBg.to})` }}
+          />
+        )}
+        {/* YouTube karaoke embed */}
+        {karaokeOn && karaokeVideoId ? (
+          <div className="absolute inset-0 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.85)" }}>
+            <div className="w-full" style={{ maxWidth: "min(90vw, calc(90vh * 16/9))", aspectRatio: "16/9" }}>
+              <iframe
+                key={karaokeVideoId}
+                title="노래방 유튜브"
+                src={`https://www.youtube.com/embed/${karaokeVideoId}?autoplay=1&rel=0&modestbranding=1`}
+                allow="autoplay; encrypted-media; fullscreen"
+                allowFullScreen
+                className="w-full h-full rounded-xl border-0"
+              />
+            </div>
+          </div>
+        ) : (
+          /* Mock camera silhouette */
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none">
+            <span className="text-[18vw] opacity-[0.04]">{spotlightedP ? "👤" : "🎙️"}</span>
+          </div>
+        )}
+        {/* Vignette — skip when video is playing */}
+        {!(karaokeOn && karaokeVideoId) && (
+          <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse at center, transparent 25%, rgba(0,0,0,0.8) 100%)" }} />
+        )}
         {/* Spotlight name tag */}
         {spotlightedP && (
           <div
@@ -424,28 +539,54 @@ export function PartyRoomShell({
                     </div>
                   ))
                 : (displayParticipants ?? MOCK_PARTICIPANTS).map(p => (
-                    <div
-                      key={p.id}
-                      className="relative rounded-xl overflow-hidden cursor-pointer"
-                      style={{
-                        background: "rgba(255,255,255,0.06)",
-                        border: `1.5px solid ${p.isKaraoke ? "rgba(236,72,153,0.65)" : spotlighted === p.id ? "rgba(0,229,255,0.65)" : "rgba(255,255,255,0.08)"}`,
-                        boxShadow: p.isKaraoke ? "0 0 10px rgba(236,72,153,0.25)" : spotlighted === p.id ? "0 0 10px rgba(0,229,255,0.25)" : "none",
-                      }}
-                      onClick={e => { e.stopPropagation(); setContextMenu({ x: e.clientX, y: e.clientY, pid: p.id }); }}
-                    >
-                      <div className="h-16 flex flex-col items-center justify-center gap-1 p-1">
-                        <span className="text-2xl">👤</span>
-                        <span className="text-[9px] text-white/70 truncate w-full text-center px-1 leading-tight">{p.name}</span>
+                    hiddenParticipants.has(p.id) ? (
+                      isHost && (
+                        <button
+                          key={p.id}
+                          type="button"
+                          onClick={() => toggleParticipantVisibility(p.id)}
+                          className="relative rounded-xl overflow-hidden h-16 flex flex-col items-center justify-center gap-0.5"
+                          style={{ background: "rgba(255,255,255,0.03)", border: "1px dashed rgba(255,255,255,0.12)" }}
+                        >
+                          <Icon icon="solar:eye-bold" className="w-3.5 h-3.5 text-white/20" />
+                          <span className="text-[8px] text-white/25 truncate px-1 text-center">{p.name}</span>
+                        </button>
+                      )
+                    ) : (
+                      <div
+                        key={p.id}
+                        className="relative rounded-xl overflow-hidden cursor-pointer group"
+                        style={{
+                          background: "rgba(255,255,255,0.06)",
+                          border: `1.5px solid ${p.isKaraoke ? "rgba(236,72,153,0.65)" : spotlighted === p.id ? "rgba(0,229,255,0.65)" : "rgba(255,255,255,0.08)"}`,
+                          boxShadow: p.isKaraoke ? "0 0 10px rgba(236,72,153,0.25)" : spotlighted === p.id ? "0 0 10px rgba(0,229,255,0.25)" : "none",
+                        }}
+                        onClick={e => { e.stopPropagation(); setContextMenu({ x: e.clientX, y: e.clientY, pid: p.id }); }}
+                      >
+                        <div className="h-16 flex flex-col items-center justify-center gap-1 p-1">
+                          <span className="text-2xl">👤</span>
+                          <span className="text-[9px] text-white/70 truncate w-full text-center px-1 leading-tight">{p.name}</span>
+                        </div>
+                        <div className="absolute bottom-1 right-1 flex items-center gap-0.5">
+                          {p.isKaraoke && <span className="text-[9px] leading-none">🎤</span>}
+                          {p.isPaid
+                            ? <Icon icon={p.isMuted ? "solar:microphone-slash-bold" : "solar:microphone-bold"} className={`w-3 h-3 ${p.isMuted ? "text-white/15" : "text-white/60"}`} />
+                            : <span className="text-[9px]">🔒</span>
+                          }
+                        </div>
+                        {isHost && (
+                          <button
+                            type="button"
+                            aria-label="참여자 화면 숨기기"
+                            onClick={e => { e.stopPropagation(); toggleParticipantVisibility(p.id); }}
+                            className="absolute top-0.5 right-0.5 opacity-0 group-hover:opacity-100 transition-opacity rounded-md p-0.5"
+                            style={{ background: "rgba(0,0,0,0.6)" }}
+                          >
+                            <Icon icon="solar:eye-slash-bold" className="w-3 h-3 text-white/50" />
+                          </button>
+                        )}
                       </div>
-                      <div className="absolute bottom-1 right-1 flex items-center gap-0.5">
-                        {p.isKaraoke && <span className="text-[9px] leading-none">🎤</span>}
-                        {p.isPaid
-                          ? <Icon icon={p.isMuted ? "solar:microphone-slash-bold" : "solar:microphone-bold"} className={`w-3 h-3 ${p.isMuted ? "text-white/15" : "text-white/60"}`} />
-                          : <span className="text-[9px]">🔒</span>
-                        }
-                      </div>
-                    </div>
+                    )
                   ))
               }
             </div>
@@ -473,6 +614,11 @@ export function PartyRoomShell({
               { icon: "solar:star-bold",              label: "메인으로 올리기",       action: () => setSpotlighted(contextMenu.pid) },
               { icon: "solar:microphone-bold",         label: "마이크 켜기 / 끄기",    action: () => {} },
               { icon: "solar:music-note-2-bold",       label: "노래방 마이크 활성화",  action: () => {} },
+              {
+                icon: hiddenParticipants.has(contextMenu.pid) ? "solar:eye-bold" : "solar:eye-slash-bold",
+                label: hiddenParticipants.has(contextMenu.pid) ? "화면 보이기" : "화면 숨기기",
+                action: () => toggleParticipantVisibility(contextMenu.pid),
+              },
               { icon: "solar:user-block-rounded-bold", label: "내보내기",              action: () => {}, danger: true },
             ].map(item => (
               <button
@@ -552,13 +698,25 @@ export function PartyRoomShell({
                 </button>
               ))}
               <button
-                onClick={() => setBgPickerOpen(false)}
-                className="h-20 rounded-xl border flex flex-col items-center justify-center gap-1 transition-all hover:border-white/30"
-                style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.1)" }}
+                onClick={activateCameraBg}
+                className="h-20 rounded-xl flex flex-col items-center justify-center gap-1 transition-all hover:border-white/30"
+                style={{
+                  background: bgMode === "camera" ? "rgba(0,229,255,0.1)" : "rgba(255,255,255,0.03)",
+                  border: bgMode === "camera" ? "2px solid rgba(0,229,255,0.6)" : "1px solid rgba(255,255,255,0.1)",
+                }}
               >
-                <Icon icon="solar:camera-bold" className="w-6 h-6 text-white/40" />
-                <span className="text-[10px] text-white/35">카메라</span>
+                <Icon icon="solar:camera-bold" className="w-6 h-6" style={{ color: bgMode === "camera" ? "#00E5FF" : "rgba(255,255,255,0.4)" }} />
+                <span className="text-[10px]" style={{ color: bgMode === "camera" ? "#00E5FF" : "rgba(255,255,255,0.35)" }}>카메라</span>
               </button>
+              {bgMode === "camera" && (
+                <button
+                  onClick={() => { deactivateCameraBg(); setBgPickerOpen(false); }}
+                  className="col-span-2 py-2 rounded-xl text-[11px] font-medium transition-all"
+                  style={{ background: "rgba(239,68,68,0.12)", border: "1px solid rgba(239,68,68,0.3)", color: "#ef4444" }}
+                >
+                  📷 카메라 배경 끄기
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -580,10 +738,19 @@ export function PartyRoomShell({
             <p className="text-xs text-white/20">채팅이 여기에 표시됩니다</p>
           </div>
           <div className="p-3 border-t flex-shrink-0" style={{ borderColor: "rgba(255,255,255,0.07)" }}>
-            <input
-              placeholder="메시지 입력..."
-              className="w-full px-3 py-2 rounded-lg text-xs text-white outline-none placeholder-white/20"
-              style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)" }}
+            <textarea
+              rows={1}
+              value={chatInput}
+              onChange={e => setChatInput(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  if (chatInput.trim()) setChatInput("");
+                }
+              }}
+              placeholder="메시지 입력... (Enter 전송 / Shift+Enter 줄바꿈)"
+              className="w-full px-3 py-2 rounded-lg text-xs text-white outline-none placeholder-white/20 resize-none"
+              style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", maxHeight: 80 }}
             />
           </div>
         </div>
@@ -622,7 +789,7 @@ export function PartyRoomShell({
           <div
             className="fixed inset-0 z-40"
             style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}
-            onClick={() => setSettingsOpen(false)}
+            onClick={closeSettings}
           />
           {/* Drawer */}
           <div
@@ -636,7 +803,7 @@ export function PartyRoomShell({
                 <span className="text-sm font-bold text-white/80">설정</span>
               </div>
               <button
-                onClick={() => setSettingsOpen(false)}
+                onClick={closeSettings}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-full transition-all"
                 style={{ background: "rgba(255,255,255,0.08)" }}
                 onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.15)")}

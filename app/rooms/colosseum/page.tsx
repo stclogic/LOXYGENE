@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Icon } from "@iconify/react";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { NeonButton } from "@/components/ui/NeonButton";
@@ -99,6 +100,7 @@ interface CreateRoomForm {
 }
 
 export default function ColosseumLobbyPage() {
+  const router = useRouter();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [form, setForm] = useState<CreateRoomForm>({
     title: "",
@@ -107,8 +109,47 @@ export default function ColosseumLobbyPage() {
     hasPassword: false,
     password: "",
   });
+  const [rooms, setRooms] = useState(MOCK_ROOMS);
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState("");
 
-  const totalUsers = MOCK_ROOMS.reduce((sum, r) => sum + r.participantCount, 0);
+  useEffect(() => {
+    fetch("/api/rooms/list?type=colosseum")
+      .then((r) => r.json())
+      .then((data) => { if (data.rooms?.length) setRooms(data.rooms); })
+      .catch((err) => console.error("Failed to load rooms:", err));
+  }, []);
+
+  const handleCreateRoom = async () => {
+    if (!form.title.trim()) return;
+    setCreating(true);
+    setCreateError("");
+    try {
+      const res = await fetch("/api/rooms/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: form.title,
+          type: "colosseum",
+          maxParticipants: form.maxParticipants,
+          isPrivate: form.hasPassword,
+          password: form.hasPassword ? form.password : undefined,
+        }),
+      });
+      const data = await res.json();
+      if (data.roomId) {
+        router.push(`/rooms/colosseum/${data.roomId}`);
+      } else {
+        setCreateError(data.error ?? "방 만들기 실패");
+      }
+    } catch {
+      setCreateError("네트워크 오류가 발생했습니다.");
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const totalUsers = rooms.reduce((sum, r) => sum + (r.participantCount ?? 0), 0);
 
   return (
     <div className="min-h-screen bg-[#070707] relative overflow-hidden">
@@ -400,16 +441,22 @@ export default function ColosseumLobbyPage() {
                 />
               )}
 
+              {createError && (
+                <p className="text-xs rounded-lg px-3 py-2" style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)", color: "#f87171" }}>
+                  {createError}
+                </p>
+              )}
               {/* Submit */}
               <NeonButton
                 variant="pink"
                 size="lg"
                 fullWidth
-                onClick={() => setShowCreateModal(false)}
+                onClick={handleCreateRoom}
+                disabled={creating}
               >
                 <div className="flex items-center justify-center gap-2">
                   <Icon icon="solar:add-circle-bold" className="w-5 h-5" />
-                  방 개설하기
+                  {creating ? "생성 중..." : "방 개설하기"}
                 </div>
               </NeonButton>
             </div>

@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Icon } from "@iconify/react";
 
@@ -21,14 +22,48 @@ const TOPIC_COLORS: Record<string, string> = {
 };
 
 export default function TalkShowLobbyPage() {
+  const router = useRouter();
   const [showCreate, setShowCreate] = useState(false);
   const [title, setTitle] = useState("");
   const [topic, setTopic] = useState("연애");
   const [maxPanels, setMaxPanels] = useState(4);
   const [filter, setFilter] = useState("전체");
+  const [rooms, setRooms] = useState(MOCK_ROOMS);
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState("");
 
-  const totalAudience = MOCK_ROOMS.reduce((s, r) => s + r.audience, 0);
-  const filtered = filter === "전체" ? MOCK_ROOMS : MOCK_ROOMS.filter(r => r.topic === filter || r.tags.some(t => t.includes(filter.replace("#", ""))));
+  useEffect(() => {
+    fetch("/api/rooms/list?type=talkshow")
+      .then((r) => r.json())
+      .then((data) => { if (data.rooms?.length) setRooms(data.rooms); })
+      .catch((err) => console.error("Failed to load rooms:", err));
+  }, []);
+
+  const handleCreateRoom = async () => {
+    if (!title.trim()) return;
+    setCreating(true);
+    setCreateError("");
+    try {
+      const res = await fetch("/api/rooms/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title, type: "talkshow", maxParticipants: maxPanels, isPrivate: false }),
+      });
+      const data = await res.json();
+      if (data.roomId) {
+        router.push(`/rooms/talkshow/${data.roomId}`);
+      } else {
+        setCreateError(data.error ?? "방 만들기 실패");
+      }
+    } catch {
+      setCreateError("네트워크 오류가 발생했습니다.");
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const totalAudience = rooms.reduce((s, r) => s + (r.audience ?? 0), 0);
+  const filtered = filter === "전체" ? rooms : rooms.filter((r) => r.topic === filter || r.tags.some((t) => t.includes(filter.replace("#", ""))));
 
   return (
     <div className="min-h-screen bg-[#070707] relative overflow-hidden">
@@ -158,10 +193,11 @@ export default function TalkShowLobbyPage() {
               <label className="text-xs text-white/40 tracking-wider">최대 패널 수: <span style={{ color: ACCENT }}>{maxPanels}명</span></label>
               <input type="range" min={2} max={8} value={maxPanels} onChange={e => setMaxPanels(Number(e.target.value))} className="w-full" />
             </div>
-            <button onClick={() => setShowCreate(false)}
-              className="w-full py-3 rounded-xl font-bold transition-all active:scale-95"
+            {createError && <p className="text-xs text-red-400">{createError}</p>}
+            <button onClick={handleCreateRoom} disabled={creating}
+              className="w-full py-3 rounded-xl font-bold transition-all active:scale-95 disabled:opacity-50"
               style={{ background: `rgba(139,92,246,0.15)`, border: `1px solid ${ACCENT}50`, color: ACCENT }}>
-              🎙️ 토크방 만들기
+              {creating ? "생성 중..." : "🎙️ 토크방 만들기"}
             </button>
           </div>
         </div>

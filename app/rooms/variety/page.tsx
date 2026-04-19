@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Icon } from "@iconify/react";
 
@@ -20,14 +21,48 @@ const GAME_TYPES = ["스피드퀴즈", "진실or거짓", "몸으로말해요"];
 const GAME_ICONS: Record<string, string> = { "스피드퀴즈": "⚡", "진실or거짓": "🤔", "몸으로말해요": "🎭" };
 
 export default function VarietyLobbyPage() {
+  const router = useRouter();
   const [showCreate, setShowCreate] = useState(false);
   const [title, setTitle] = useState("");
   const [gameType, setGameType] = useState("스피드퀴즈");
   const [maxP, setMaxP] = useState(8);
   const [filter, setFilter] = useState("전체");
+  const [rooms, setRooms] = useState(MOCK_ROOMS);
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState("");
 
-  const totalPlayers = MOCK_ROOMS.reduce((s, r) => s + r.participants, 0);
-  const filtered = filter === "전체" ? MOCK_ROOMS : MOCK_ROOMS.filter(r => r.gameType === filter || r.tags.some(t => t.includes(filter.replace("#", ""))));
+  useEffect(() => {
+    fetch("/api/rooms/list?type=variety")
+      .then((r) => r.json())
+      .then((data) => { if (data.rooms?.length) setRooms(data.rooms); })
+      .catch((err) => console.error("Failed to load rooms:", err));
+  }, []);
+
+  const handleCreateRoom = async () => {
+    if (!title.trim()) return;
+    setCreating(true);
+    setCreateError("");
+    try {
+      const res = await fetch("/api/rooms/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title, type: "variety", maxParticipants: maxP, isPrivate: false }),
+      });
+      const data = await res.json();
+      if (data.roomId) {
+        router.push(`/rooms/variety/${data.roomId}`);
+      } else {
+        setCreateError(data.error ?? "방 만들기 실패");
+      }
+    } catch {
+      setCreateError("네트워크 오류가 발생했습니다.");
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const totalPlayers = rooms.reduce((s, r) => s + (r.participants ?? 0), 0);
+  const filtered = filter === "전체" ? rooms : rooms.filter((r) => r.gameType === filter || r.tags.some((t) => t.includes(filter.replace("#", ""))));
 
   return (
     <div className="min-h-screen bg-[#070707] relative overflow-hidden">
@@ -155,10 +190,11 @@ export default function VarietyLobbyPage() {
               <input type="range" min={4} max={20} value={maxP} onChange={e => setMaxP(Number(e.target.value))} className="w-full" />
             </div>
 
-            <button onClick={() => setShowCreate(false)}
-              className="w-full py-3 rounded-xl font-bold transition-all active:scale-95"
+            {createError && <p className="text-xs text-red-400">{createError}</p>}
+            <button onClick={handleCreateRoom} disabled={creating}
+              className="w-full py-3 rounded-xl font-bold transition-all active:scale-95 disabled:opacity-50"
               style={{ background: `rgba(255,140,0,0.15)`, border: `1px solid ${ACCENT}50`, color: ACCENT }}>
-              🎮 방 만들기
+              {creating ? "생성 중..." : "🎮 방 만들기"}
             </button>
           </div>
         </div>

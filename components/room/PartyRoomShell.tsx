@@ -421,9 +421,10 @@ export function PartyRoomShell({
 
   // ── Video panel drag ─────────────────────────────────────────────────────
   const startVideoDrag = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
     videoDragging.current = true;
     videoDragOrigin.current = { mx: e.clientX, my: e.clientY, px: videoPanelPos.x, py: videoPanelPos.y };
-    e.preventDefault();
     const onMove = (ev: MouseEvent) => {
       if (!videoDragging.current) return;
       setVideoPanelPos({
@@ -711,8 +712,9 @@ export function PartyRoomShell({
                   className="relative flex-shrink-0 flex flex-col items-center gap-0.5 cursor-pointer group"
                   style={{
                     width: 56,
-                    opacity: hidden ? 0.35 : dimmedDockItems.has(p.id) ? 0.45 : 1,
-                    transition: "opacity 0.25s ease",
+                    opacity: hidden ? 0.35 : dimmedDockItems.has(p.id) ? 0.3 : 1,
+                    filter: dimmedDockItems.has(p.id) ? "grayscale(0.8)" : "none",
+                    transition: "opacity 0.3s ease, filter 0.3s ease",
                   }}
                   onClick={e => { e.stopPropagation(); if (!hidden) toggleDockDim(p.id); }}
                   onContextMenu={e => { e.preventDefault(); e.stopPropagation(); if (!hidden) setContextMenu({ x: e.clientX, y: e.clientY, pid: p.id }); }}

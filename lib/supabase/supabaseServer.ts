@@ -10,6 +10,7 @@ export function getSupabaseServer() {
   // Prefer service role key for full access; fall back to anon key in dev
   const key =
     process.env.SUPABASE_SERVICE_ROLE_KEY ??
+    process.env.SUPABASE_SECRET_KEY ??
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
     "";
 

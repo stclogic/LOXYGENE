@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
 
   const supabase = createClient(
     supabaseUrl,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY)!
   );
 
   // Idempotency check

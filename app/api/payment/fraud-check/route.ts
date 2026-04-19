@@ -66,7 +66,7 @@ export async function POST(req: NextRequest) {
       const { createClient } = await import('@supabase/supabase-js');
       const supabase = createClient(
         supabaseUrl,
-        process.env.SUPABASE_SERVICE_ROLE_KEY!
+        (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY)!
       );
       await supabase.from('fraud_logs').insert({
         user_id: userId,

@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import type { DailyParticipant } from "@/hooks/useDailyCall";
 import Link from "next/link";
 import { Icon } from "@iconify/react";
+import { YouTubeBackgroundPlayer } from "@/components/room/YouTubeBackgroundPlayer";
 
 const MOCK_PARTICIPANTS = [
   { id: "p1", name: "별빛가수", isPaid: true, isMuted: false, isKaraoke: true },
@@ -34,6 +35,7 @@ interface Props {
   extraBarControls?: React.ReactNode;
   dailyParticipants?: Record<string, DailyParticipant>;
   karaokeVideoId?: string;
+  karaokeLyrics?: string[];
 }
 
 // ── In-room mini settings components ──────────────────────────────────────
@@ -191,6 +193,7 @@ export function PartyRoomShell({
   extraBarControls,
   dailyParticipants,
   karaokeVideoId,
+  karaokeLyrics = [],
 }: Props) {
   const [micOn, setMicOn] = useState(false);
   const [camOn, setCamOn] = useState(true);
@@ -231,6 +234,27 @@ export function PartyRoomShell({
 
   // Chat input
   const [chatInput, setChatInput] = useState("");
+
+  // Item VFX
+  const [vfxParticles, setVfxParticles] = useState<{ id: number; emoji: string; x: number }[]>([]);
+  const vfxCounter = useRef(0);
+
+  const sendItem = async (itemType: "bouquet" | "champagne" | "clap" | "heart") => {
+    const EMOJI: Record<string, string> = { bouquet: "💐", champagne: "🥂", clap: "👏", heart: "❤️" };
+    // Fire VFX immediately (optimistic)
+    const id = ++vfxCounter.current;
+    const x = 30 + Math.random() * 40; // % from left
+    setVfxParticles(p => [...p, { id, emoji: EMOJI[itemType], x }]);
+    setTimeout(() => setVfxParticles(p => p.filter(v => v.id !== id)), 2200);
+
+    try {
+      await fetch("/api/items/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ itemType, roomId: "current", hostId: "host", directorId: undefined }),
+      });
+    } catch { /* non-blocking */ }
+  };
 
   const activateCameraBg = async () => {
     try {
@@ -372,14 +396,14 @@ export function PartyRoomShell({
             style={{ background: `linear-gradient(135deg, ${selectedBg.from}, ${selectedBg.via}, ${selectedBg.to})` }}
           />
         )}
-        {/* YouTube karaoke embed */}
-        {karaokeOn && karaokeVideoId ? (
-          <div className="absolute inset-0 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.85)" }}>
+        {/* YouTube karaoke embed — show whenever a video ID is set */}
+        {karaokeVideoId ? (
+          <div className="absolute inset-0 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.9)" }}>
             <div className="w-full" style={{ maxWidth: "min(90vw, calc(90vh * 16/9))", aspectRatio: "16/9" }}>
               <iframe
                 key={karaokeVideoId}
                 title="노래방 유튜브"
-                src={`https://www.youtube.com/embed/${karaokeVideoId}?autoplay=1&rel=0&modestbranding=1`}
+                src={`https://www.youtube.com/embed/${karaokeVideoId}?rel=0&modestbranding=1`}
                 allow="autoplay; encrypted-media; fullscreen"
                 allowFullScreen
                 className="w-full h-full rounded-xl border-0"
@@ -393,9 +417,32 @@ export function PartyRoomShell({
           </div>
         )}
         {/* Vignette — skip when video is playing */}
-        {!(karaokeOn && karaokeVideoId) && (
+        {!karaokeVideoId && (
           <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse at center, transparent 25%, rgba(0,0,0,0.8) 100%)" }} />
         )}
+        {/* Karaoke lyrics teleprompter */}
+        {karaokeVideoId && karaokeLyrics.length > 0 && (
+          <div
+            className="absolute bottom-20 left-0 right-0 z-10 flex flex-col items-center gap-1 px-6 py-3 pointer-events-none"
+            style={{ background: "linear-gradient(to top, rgba(0,0,0,0.75) 0%, transparent 100%)" }}
+          >
+            {karaokeLyrics.slice(0, 4).map((line, i) => (
+              <p
+                key={i}
+                className="text-center font-semibold drop-shadow-lg"
+                style={{
+                  fontSize: i === 0 ? "1.1rem" : "0.8rem",
+                  color: i === 0 ? "#00E5FF" : "rgba(255,255,255,0.45)",
+                  textShadow: i === 0 ? "0 0 20px rgba(0,229,255,0.6)" : "none",
+                  letterSpacing: "0.05em",
+                }}
+              >
+                {line}
+              </p>
+            ))}
+          </div>
+        )}
+
         {/* Spotlight name tag */}
         {spotlightedP && (
           <div
@@ -423,7 +470,8 @@ export function PartyRoomShell({
           </h1>
           {roomSubtitle && <p className="text-white/30 text-[10px] mt-0.5">{roomSubtitle}</p>}
         </div>
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2">
+          <YouTubeBackgroundPlayer videoId="vh9pvpFK8bE" />
           <div className="flex items-center gap-1 px-2 py-1 rounded-full" style={{ background: "rgba(239,68,68,0.15)", border: "1px solid rgba(239,68,68,0.3)" }}>
             <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse block" />
             <span className="text-[10px] text-red-400 font-semibold">LIVE</span>
@@ -499,100 +547,95 @@ export function PartyRoomShell({
         </div>
       )}
 
-      {/* ── PARTICIPANT GRID (top-right floating overlay) ── */}
-      <div className="absolute z-30" style={{ top: isHost ? 148 : 108, right: 12 }}>
-        <div className="flex flex-col items-end gap-1.5">
-          <button
-            onClick={() => setGridCollapsed(v => !v)}
-            className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] transition-all"
-            style={{ background: "rgba(0,0,0,0.6)", border: "1px solid rgba(255,255,255,0.08)", backdropFilter: "blur(8px)", color: "rgba(255,255,255,0.4)" }}
+      {/* ── PARTICIPANT DOCK (bottom horizontal, Apple-dock style) ── */}
+      {!gridCollapsed && (
+        <div
+          className="absolute left-0 right-0 z-25 flex items-end"
+          style={{ bottom: 76, pointerEvents: "none" }}
+        >
+          <div
+            className="w-full flex gap-2 overflow-x-auto px-3 py-2"
+            style={{ scrollbarWidth: "none", pointerEvents: "auto", background: "linear-gradient(to top, rgba(0,0,0,0.45) 0%, transparent 100%)" }}
           >
-            <Icon icon={gridCollapsed ? "solar:users-group-two-rounded-bold" : "solar:arrow-right-linear"} className="w-3 h-3" />
-            {gridCollapsed
-              ? `${hasDailyParticipants ? Object.keys(dailyParticipants!).length : MOCK_PARTICIPANTS.length}명`
-              : "접기"}
-          </button>
-          {!gridCollapsed && (
-            <div className="grid grid-cols-2 gap-1.5" style={{ width: 168 }}>
-              {hasDailyParticipants
-                ? Object.entries(dailyParticipants!).map(([sid, p]) => (
-                    <div
-                      key={sid}
-                      className="relative rounded-xl overflow-hidden cursor-pointer"
-                      style={{
-                        background: "rgba(255,255,255,0.06)",
-                        border: `1.5px solid ${spotlighted === sid ? "rgba(0,229,255,0.65)" : "rgba(255,255,255,0.08)"}`,
-                        boxShadow: spotlighted === sid ? "0 0 10px rgba(0,229,255,0.25)" : "none",
-                      }}
-                      onClick={e => { e.stopPropagation(); setContextMenu({ x: e.clientX, y: e.clientY, pid: sid }); }}
-                    >
-                      <VideoTile
-                        track={p.tracks?.video?.persistentTrack}
-                        name={p.user_name ?? sid.slice(0, 8)}
-                      />
-                      <div className="absolute bottom-1 right-1 flex items-center gap-0.5">
-                        <Icon
-                          icon={p.tracks?.audio?.state === "off" ? "solar:microphone-slash-bold" : "solar:microphone-bold"}
-                          className={`w-3 h-3 ${p.tracks?.audio?.state === "off" ? "text-white/15" : "text-white/60"}`}
-                        />
-                      </div>
-                    </div>
-                  ))
-                : (displayParticipants ?? MOCK_PARTICIPANTS).map(p => (
-                    hiddenParticipants.has(p.id) ? (
-                      isHost && (
-                        <button
-                          key={p.id}
-                          type="button"
-                          onClick={() => toggleParticipantVisibility(p.id)}
-                          className="relative rounded-xl overflow-hidden h-16 flex flex-col items-center justify-center gap-0.5"
-                          style={{ background: "rgba(255,255,255,0.03)", border: "1px dashed rgba(255,255,255,0.12)" }}
-                        >
-                          <Icon icon="solar:eye-bold" className="w-3.5 h-3.5 text-white/20" />
-                          <span className="text-[8px] text-white/25 truncate px-1 text-center">{p.name}</span>
-                        </button>
-                      )
+            {(hasDailyParticipants
+              ? Object.entries(dailyParticipants!).map(([sid, p]) => ({
+                  id: sid,
+                  name: p.user_name ?? sid.slice(0, 8),
+                  isMuted: p.tracks?.audio?.state === "off",
+                  isKaraoke: false,
+                  track: p.tracks?.video?.persistentTrack,
+                }))
+              : (displayParticipants ?? MOCK_PARTICIPANTS).map(p => ({
+                  id: p.id, name: p.name, isMuted: p.isMuted, isKaraoke: p.isKaraoke, track: undefined,
+                }))
+            ).map(p => {
+              const hidden = hiddenParticipants.has(p.id);
+              const isSpot = spotlighted === p.id;
+              return (
+                <div
+                  key={p.id}
+                  className="relative flex-shrink-0 flex flex-col items-center gap-0.5 cursor-pointer group"
+                  style={{ width: 56 }}
+                  onClick={e => { e.stopPropagation(); if (!hidden) setContextMenu({ x: e.clientX, y: e.clientY, pid: p.id }); }}
+                >
+                  {/* Avatar tile */}
+                  <div
+                    className="w-14 h-14 rounded-2xl overflow-hidden flex items-center justify-center relative"
+                    style={{
+                      background: hidden ? "rgba(255,255,255,0.03)" : "rgba(255,255,255,0.08)",
+                      border: `1.5px solid ${isSpot ? "rgba(0,229,255,0.7)" : p.isKaraoke ? "rgba(236,72,153,0.7)" : "rgba(255,255,255,0.1)"}`,
+                      boxShadow: isSpot ? "0 0 12px rgba(0,229,255,0.35)" : "none",
+                      backdropFilter: "blur(8px)",
+                      opacity: hidden ? 0.35 : 1,
+                    }}
+                  >
+                    {hidden ? (
+                      <Icon icon="solar:eye-slash-bold" className="w-4 h-4 text-white/20" />
                     ) : (
-                      <div
-                        key={p.id}
-                        className="relative rounded-xl overflow-hidden cursor-pointer group"
-                        style={{
-                          background: "rgba(255,255,255,0.06)",
-                          border: `1.5px solid ${p.isKaraoke ? "rgba(236,72,153,0.65)" : spotlighted === p.id ? "rgba(0,229,255,0.65)" : "rgba(255,255,255,0.08)"}`,
-                          boxShadow: p.isKaraoke ? "0 0 10px rgba(236,72,153,0.25)" : spotlighted === p.id ? "0 0 10px rgba(0,229,255,0.25)" : "none",
-                        }}
-                        onClick={e => { e.stopPropagation(); setContextMenu({ x: e.clientX, y: e.clientY, pid: p.id }); }}
+                      <span className="text-xl">👤</span>
+                    )}
+                    {/* Mic status dot */}
+                    <span
+                      className="absolute bottom-1 right-1 w-2 h-2 rounded-full"
+                      style={{ background: p.isMuted ? "rgba(239,68,68,0.8)" : "rgba(0,229,255,0.8)" }}
+                    />
+                    {/* Karaoke mic badge */}
+                    {p.isKaraoke && (
+                      <span className="absolute top-0.5 left-0.5 text-[9px] leading-none">🎤</span>
+                    )}
+                    {/* Host hide button */}
+                    {isHost && !hidden && (
+                      <button
+                        type="button"
+                        aria-label="화면 숨기기"
+                        onClick={e => { e.stopPropagation(); toggleParticipantVisibility(p.id); }}
+                        className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-2xl"
                       >
-                        <div className="h-16 flex flex-col items-center justify-center gap-1 p-1">
-                          <span className="text-2xl">👤</span>
-                          <span className="text-[9px] text-white/70 truncate w-full text-center px-1 leading-tight">{p.name}</span>
-                        </div>
-                        <div className="absolute bottom-1 right-1 flex items-center gap-0.5">
-                          {p.isKaraoke && <span className="text-[9px] leading-none">🎤</span>}
-                          {p.isPaid
-                            ? <Icon icon={p.isMuted ? "solar:microphone-slash-bold" : "solar:microphone-bold"} className={`w-3 h-3 ${p.isMuted ? "text-white/15" : "text-white/60"}`} />
-                            : <span className="text-[9px]">🔒</span>
-                          }
-                        </div>
-                        {isHost && (
-                          <button
-                            type="button"
-                            aria-label="참여자 화면 숨기기"
-                            onClick={e => { e.stopPropagation(); toggleParticipantVisibility(p.id); }}
-                            className="absolute top-0.5 right-0.5 opacity-0 group-hover:opacity-100 transition-opacity rounded-md p-0.5"
-                            style={{ background: "rgba(0,0,0,0.6)" }}
-                          >
-                            <Icon icon="solar:eye-slash-bold" className="w-3 h-3 text-white/50" />
-                          </button>
-                        )}
-                      </div>
-                    )
-                  ))
-              }
-            </div>
-          )}
+                        <Icon icon="solar:eye-slash-bold" className="w-4 h-4 text-white/70" />
+                      </button>
+                    )}
+                  </div>
+                  {/* Name */}
+                  <span className="text-[8px] text-white/50 truncate w-full text-center leading-tight px-0.5">{p.name}</span>
+                </div>
+              );
+            })}
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* Dock collapse/expand toggle */}
+      <button
+        type="button"
+        onClick={() => setGridCollapsed(v => !v)}
+        className="absolute z-30 flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] transition-all"
+        style={{ bottom: 130, left: 12, background: "rgba(0,0,0,0.5)", border: "1px solid rgba(255,255,255,0.08)", backdropFilter: "blur(8px)", color: "rgba(255,255,255,0.4)" }}
+      >
+        <Icon icon={gridCollapsed ? "solar:users-group-two-rounded-bold" : "solar:alt-arrow-down-bold"} className="w-3 h-3" />
+        {gridCollapsed
+          ? `${hasDailyParticipants ? Object.keys(dailyParticipants!).length : MOCK_PARTICIPANTS.length}명`
+          : "접기"}
+      </button>
 
       {/* ── PARTICIPANT CONTEXT MENU ── */}
       {contextMenu && (
@@ -722,22 +765,32 @@ export function PartyRoomShell({
         </div>
       )}
 
-      {/* ── CHAT DRAWER ── */}
+      {/* ── CHAT DRAWER (left side, transparent glassmorphism) ── */}
       {chatOpen && (
         <div
-          className="absolute right-0 top-0 bottom-0 z-30 flex flex-col w-72"
-          style={{ background: "rgba(4,4,14,0.93)", borderLeft: "1px solid rgba(255,255,255,0.07)", backdropFilter: "blur(24px)" }}
+          className="absolute left-0 top-0 bottom-0 z-30 flex flex-col w-64"
+          style={{ background: "rgba(2,4,12,0.45)", borderRight: "1px solid rgba(255,255,255,0.06)", backdropFilter: "blur(28px)" }}
         >
-          <div className="flex items-center justify-between px-4 py-3 border-b flex-shrink-0" style={{ borderColor: "rgba(255,255,255,0.07)" }}>
-            <span className="text-sm font-bold text-white/70">💬 채팅</span>
-            <button onClick={() => setChatOpen(false)} className="text-white/30 hover:text-white/60 transition-colors">
+          <div className="flex items-center justify-between px-3 py-2.5 flex-shrink-0" style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+            <span className="text-xs font-semibold text-white/50 tracking-widest">💬 CHAT</span>
+            <button aria-label="채팅 닫기" onClick={() => setChatOpen(false)} className="text-white/25 hover:text-white/55 transition-colors">
               <Icon icon="solar:close-circle-linear" className="w-4 h-4" />
             </button>
           </div>
-          <div className="flex-1 p-3 flex items-center justify-center">
-            <p className="text-xs text-white/20">채팅이 여기에 표시됩니다</p>
+          <div className="flex-1 p-3 flex flex-col gap-1.5 overflow-y-auto" style={{ scrollbarWidth: "none" }}>
+            {/* Placeholder messages */}
+            {[
+              { name: "별빛가수", msg: "와 오늘 분위기 최고다!", time: "21:04" },
+              { name: "달빛연인", msg: "🎵 노래 신청합니다~", time: "21:05" },
+              { name: "구름위", msg: "파티 너무 좋아요 💙", time: "21:06" },
+            ].map((m, i) => (
+              <div key={i} className="flex flex-col gap-0.5">
+                <span className="text-[9px] text-white/30">{m.name} · {m.time}</span>
+                <p className="text-[11px] text-white/70 leading-snug">{m.msg}</p>
+              </div>
+            ))}
           </div>
-          <div className="p-3 border-t flex-shrink-0" style={{ borderColor: "rgba(255,255,255,0.07)" }}>
+          <div className="p-2.5 flex-shrink-0" style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}>
             <textarea
               rows={1}
               value={chatInput}
@@ -748,9 +801,9 @@ export function PartyRoomShell({
                   if (chatInput.trim()) setChatInput("");
                 }
               }}
-              placeholder="메시지 입력... (Enter 전송 / Shift+Enter 줄바꿈)"
-              className="w-full px-3 py-2 rounded-lg text-xs text-white outline-none placeholder-white/20 resize-none"
-              style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", maxHeight: 80 }}
+              placeholder="Enter 전송 · Shift+Enter 줄바꿈"
+              className="w-full px-2.5 py-1.5 rounded-lg text-[11px] text-white outline-none placeholder-white/15 resize-none"
+              style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.09)", maxHeight: 72 }}
             />
           </div>
         </div>
@@ -782,50 +835,41 @@ export function PartyRoomShell({
         <Icon icon="solar:settings-bold" className="w-5 h-5 text-cyan-400" />
       </button>
 
-      {/* ── IN-ROOM SETTINGS DRAWER ── */}
+      {/* ── IN-ROOM SETTINGS DRAWER (slim) ── */}
       {settingsOpen && (
         <>
-          {/* Overlay */}
-          <div
-            className="fixed inset-0 z-40"
-            style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}
-            onClick={closeSettings}
-          />
-          {/* Drawer */}
+          <div className="fixed inset-0 z-40" style={{ background: "rgba(0,0,0,0.45)", backdropFilter: "blur(3px)" }} onClick={closeSettings} />
           <div
             className="fixed left-0 right-0 bottom-0 z-50 flex flex-col rounded-t-2xl"
-            style={{ height: "70vh", background: "#0a0f1e", borderTop: "1px solid rgba(255,255,255,0.08)" }}
+            style={{ height: "44vh", background: "rgba(6,8,18,0.92)", borderTop: "1px solid rgba(255,255,255,0.07)", backdropFilter: "blur(32px)" }}
           >
-            {/* Drawer header */}
-            <div className="flex items-center justify-between px-5 py-4 border-b flex-shrink-0" style={{ borderColor: "rgba(255,255,255,0.07)" }}>
-              <div className="flex items-center gap-2">
-                <Icon icon="solar:settings-bold" className="w-4 h-4 text-cyan-400" />
-                <span className="text-sm font-bold text-white/80">설정</span>
+            {/* Handle + header */}
+            <div className="flex items-center justify-between px-4 pt-3 pb-2 flex-shrink-0">
+              <div className="absolute left-1/2 -translate-x-1/2 top-2 w-8 h-0.5 rounded-full bg-white/15" />
+              <div className="flex items-center gap-1.5 mt-1">
+                <Icon icon="solar:settings-bold" className="w-3.5 h-3.5 text-cyan-400/70" />
+                <span className="text-[11px] font-semibold tracking-widest text-white/50 uppercase">설정</span>
               </div>
-              <button
-                onClick={closeSettings}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full transition-all"
-                style={{ background: "rgba(255,255,255,0.08)" }}
-                onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.15)")}
-                onMouseLeave={e => (e.currentTarget.style.background = "rgba(255,255,255,0.08)")}
-              >
-                <Icon icon="solar:close-circle-bold" className="w-5 h-5 text-white" />
-                <span className="text-xs text-white">닫기</span>
+              <button type="button" aria-label="설정 닫기" onClick={closeSettings} className="mt-1 text-white/30 hover:text-white/60 transition-colors">
+                <Icon icon="solar:close-circle-bold" className="w-4 h-4" />
               </button>
             </div>
 
-            {/* Tab bar */}
-            <div className="flex border-b flex-shrink-0" style={{ borderColor: "rgba(255,255,255,0.07)" }}>
+            {/* Tab pills */}
+            <div className="flex gap-1.5 px-4 pb-2 flex-shrink-0">
               {(["audio", "video", "eq", "lighting"] as const).map(tab => {
-                const labels = { audio: "🎙️ 오디오", video: "📷 비디오", eq: "🎚️ EQ", lighting: "💡 조명" };
+                const labels = { audio: "🎙 오디오", video: "📷 비디오", eq: "🎚 EQ", lighting: "💡 조명" };
+                const active = settingsTab === tab;
                 return (
                   <button
                     key={tab}
+                    type="button"
                     onClick={() => setSettingsTab(tab)}
-                    className="flex-1 py-3 text-xs font-medium transition-all"
+                    className="flex-1 py-1.5 rounded-lg text-[10px] font-medium transition-all"
                     style={{
-                      color: settingsTab === tab ? "#06b6d4" : "rgba(255,255,255,0.4)",
-                      borderBottom: settingsTab === tab ? "2px solid #06b6d4" : "2px solid transparent",
+                      background: active ? "rgba(6,182,212,0.15)" : "rgba(255,255,255,0.04)",
+                      border: `1px solid ${active ? "rgba(6,182,212,0.4)" : "rgba(255,255,255,0.06)"}`,
+                      color: active ? "#06b6d4" : "rgba(255,255,255,0.35)",
                     }}
                   >
                     {labels[tab]}
@@ -835,7 +879,7 @@ export function PartyRoomShell({
             </div>
 
             {/* Tab content */}
-            <div className="flex-1 overflow-y-auto p-5" style={{ scrollbarWidth: "none" }}>
+            <div className="flex-1 overflow-y-auto px-4 pb-4" style={{ scrollbarWidth: "none" }}>
               {settingsTab === "audio" && <InRoomAudioSettings />}
               {settingsTab === "video" && <InRoomVideoSettings />}
               {settingsTab === "eq" && <InRoomEQSettings />}
@@ -898,6 +942,30 @@ export function PartyRoomShell({
           <Icon icon="solar:chat-round-bold" className="w-5 h-5" style={{ color: chatOpen ? "#00E5FF" : "rgba(255,255,255,0.4)" }} />
         </button>
 
+        {/* Item buttons: 꽃다발 / 샴페인 / 박수 / 하트 */}
+        {(
+          [
+            { type: "bouquet",    emoji: "💐", label: "꽃다발 선물" },
+            { type: "champagne",  emoji: "🥂", label: "샴페인 선물" },
+            { type: "clap",       emoji: "👏", label: "박수 보내기" },
+            { type: "heart",      emoji: "❤️", label: "하트 보내기" },
+          ] as const
+        ).map(item => (
+          <button
+            key={item.type}
+            type="button"
+            aria-label={item.label}
+            onClick={() => sendItem(item.type)}
+            className="w-12 h-12 rounded-xl flex items-center justify-center text-xl transition-all active:scale-75 hover:scale-110 flex-shrink-0"
+            style={{
+              background: "rgba(255,215,0,0.08)",
+              border: "1px solid rgba(255,215,0,0.2)",
+            }}
+          >
+            {item.emoji}
+          </button>
+        ))}
+
         {/* F&B Delivery */}
         <button
           onClick={() => setFnbOpen(true)}
@@ -948,6 +1016,8 @@ export function PartyRoomShell({
 
         {/* More */}
         <button
+          type="button"
+          aria-label="더 보기"
           className="w-12 h-12 rounded-xl flex items-center justify-center transition-all active:scale-90 flex-shrink-0"
           style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}
         >
@@ -1026,6 +1096,31 @@ export function PartyRoomShell({
         style={{ background: "rgba(0,0,0,0.9)", border: "1px solid rgba(255,0,127,0.3)", backdropFilter: "blur(20px)", boxShadow: "0 8px 32px rgba(0,0,0,0.5)" }}>
         {fnbToast}
       </div>
+    )}
+
+    {/* ── ITEM VFX PARTICLE OVERLAY ── */}
+    {vfxParticles.length > 0 && (
+      <>
+        <style>{`
+          @keyframes vfxRise {
+            0%   { opacity: 1; transform: translateY(0) scale(1); }
+            60%  { opacity: 1; transform: translateY(-55vh) scale(1.4); }
+            100% { opacity: 0; transform: translateY(-80vh) scale(0.8); }
+          }
+          .vfx-particle { animation: vfxRise 2.1s cubic-bezier(0.22,1,0.36,1) forwards; pointer-events: none; }
+        `}</style>
+        <div className="fixed inset-0 z-[65] pointer-events-none overflow-hidden">
+          {vfxParticles.map(p => (
+            <span
+              key={p.id}
+              className="vfx-particle absolute bottom-20 text-4xl select-none"
+              style={{ left: `${p.x}%` }}
+            >
+              {p.emoji}
+            </span>
+          ))}
+        </div>
+      </>
     )}
     </>
   );

@@ -5,6 +5,7 @@ import type { DailyParticipant } from "@/hooks/useDailyCall";
 import Link from "next/link";
 import { Icon } from "@iconify/react";
 import { YouTubeBackgroundPlayer } from "@/components/room/YouTubeBackgroundPlayer";
+import { FloatingChat } from "@/components/room/FloatingChat";
 
 const MOCK_PARTICIPANTS = [
   { id: "p1", name: "별빛가수", isPaid: true, isMuted: false, isKaraoke: true },
@@ -36,6 +37,8 @@ interface Props {
   dailyParticipants?: Record<string, DailyParticipant>;
   karaokeVideoId?: string;
   karaokeLyrics?: string[];
+  roomId?: string;
+  nickname?: string;
 }
 
 // ── In-room mini settings components ──────────────────────────────────────
@@ -194,6 +197,8 @@ export function PartyRoomShell({
   dailyParticipants,
   karaokeVideoId,
   karaokeLyrics = [],
+  roomId = "default",
+  nickname = "게스트",
 }: Props) {
   const [micOn, setMicOn] = useState(false);
   const [camOn, setCamOn] = useState(true);
@@ -232,8 +237,6 @@ export function PartyRoomShell({
   const hostVideoRef = useRef<HTMLVideoElement>(null);
   const [hiddenParticipants, setHiddenParticipants] = useState<Set<string>>(new Set());
 
-  // Chat input
-  const [chatInput, setChatInput] = useState("");
 
   // Item VFX
   const [vfxParticles, setVfxParticles] = useState<{ id: number; emoji: string; x: number }[]>([]);
@@ -765,48 +768,14 @@ export function PartyRoomShell({
         </div>
       )}
 
-      {/* ── CHAT DRAWER (left side, transparent glassmorphism) ── */}
+      {/* ── FLOATING CHAT ── */}
       {chatOpen && (
-        <div
-          className="absolute left-0 top-0 bottom-0 z-30 flex flex-col w-64"
-          style={{ background: "rgba(2,4,12,0.45)", borderRight: "1px solid rgba(255,255,255,0.06)", backdropFilter: "blur(28px)" }}
-        >
-          <div className="flex items-center justify-between px-3 py-2.5 flex-shrink-0" style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-            <span className="text-xs font-semibold text-white/50 tracking-widest">💬 CHAT</span>
-            <button aria-label="채팅 닫기" onClick={() => setChatOpen(false)} className="text-white/25 hover:text-white/55 transition-colors">
-              <Icon icon="solar:close-circle-linear" className="w-4 h-4" />
-            </button>
-          </div>
-          <div className="flex-1 p-3 flex flex-col gap-1.5 overflow-y-auto" style={{ scrollbarWidth: "none" }}>
-            {/* Placeholder messages */}
-            {[
-              { name: "별빛가수", msg: "와 오늘 분위기 최고다!", time: "21:04" },
-              { name: "달빛연인", msg: "🎵 노래 신청합니다~", time: "21:05" },
-              { name: "구름위", msg: "파티 너무 좋아요 💙", time: "21:06" },
-            ].map((m, i) => (
-              <div key={i} className="flex flex-col gap-0.5">
-                <span className="text-[9px] text-white/30">{m.name} · {m.time}</span>
-                <p className="text-[11px] text-white/70 leading-snug">{m.msg}</p>
-              </div>
-            ))}
-          </div>
-          <div className="p-2.5 flex-shrink-0" style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}>
-            <textarea
-              rows={1}
-              value={chatInput}
-              onChange={e => setChatInput(e.target.value)}
-              onKeyDown={e => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  if (chatInput.trim()) setChatInput("");
-                }
-              }}
-              placeholder="Enter 전송 · Shift+Enter 줄바꿈"
-              className="w-full px-2.5 py-1.5 rounded-lg text-[11px] text-white outline-none placeholder-white/15 resize-none"
-              style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.09)", maxHeight: 72 }}
-            />
-          </div>
-        </div>
+        <FloatingChat
+          roomId={roomId}
+          nickname={nickname}
+          accentColor={accentColor}
+          onClose={() => setChatOpen(false)}
+        />
       )}
 
       {/* ── LIGHTING TOAST ── */}

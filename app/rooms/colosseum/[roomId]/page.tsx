@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Icon } from "@iconify/react";
 import { PartyRoomShell } from "@/components/room/PartyRoomShell";
-import { hasNickname, setUserNickname, randomNickname } from "@/lib/utils/userSession";
+import { hasNickname, setUserNickname, randomNickname, getUserNickname } from "@/lib/utils/userSession";
 import { useDailyCall } from "@/hooks/useDailyCall";
 
 const MOCK_LYRICS = [
@@ -201,6 +201,7 @@ function KaraokePanelContent({
 export default function ColosseumRoomPage({ params }: { params: { roomId: string } }) {
   const [nicknameModalOpen, setNicknameModalOpen] = useState(false);
   const [nicknameInput, setNicknameInput] = useState("");
+  const [currentNickname, setCurrentNickname] = useState("게스트");
   const [dailyToken, setDailyToken] = useState("");
   const [dailyRoomUrl, setDailyRoomUrl] = useState("");
   const [karaokeVideoId, setKaraokeVideoId] = useState<string | null>(null);
@@ -210,7 +211,11 @@ export default function ColosseumRoomPage({ params }: { params: { roomId: string
   const { participants: dailyParticipants } = useDailyCall(dailyRoomUrl, dailyToken);
 
   useEffect(() => {
-    if (!hasNickname()) setNicknameModalOpen(true);
+    if (!hasNickname()) {
+      setNicknameModalOpen(true);
+    } else {
+      setCurrentNickname(getUserNickname());
+    }
   }, []);
 
   useEffect(() => {
@@ -236,6 +241,7 @@ export default function ColosseumRoomPage({ params }: { params: { roomId: string
     const name = nicknameInput.trim();
     if (!name) return;
     setUserNickname(name);
+    setCurrentNickname(name);
     setNicknameModalOpen(false);
   };
 
@@ -257,6 +263,8 @@ export default function ColosseumRoomPage({ params }: { params: { roomId: string
         karaokeVideoId={karaokeVideoId ?? undefined}
         karaokeLyrics={kaoraokeLyrics}
         dailyParticipants={dailyParticipants}
+        roomId={params.roomId}
+        nickname={currentNickname}
       />
 
       {/* Nickname entry modal */}

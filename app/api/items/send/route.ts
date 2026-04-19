@@ -77,7 +77,7 @@ export async function POST(req: NextRequest) {
     const hostAmt     = cost - platformAmt - directorAmt
 
     // 3. Execute: deduct sender + credit recipients in parallel
-    const ops: Promise<unknown>[] = [
+    const ops: PromiseLike<unknown>[] = [
       // Deduct sender
       supabase.rpc('adjust_wallet', { p_user_id: senderId,     p_delta: -cost }),
       // Credit host

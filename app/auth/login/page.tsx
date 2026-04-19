@@ -16,7 +16,7 @@ function LoginForm() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(
-    errorParam === "CredentialsSignin" ? "이메일 또는 비밀번호가 올바르지 않습니다." : ""
+    errorParam ? "로그인 오류: 이메일 또는 비밀번호를 확인해주세요" : ""
   );
 
   const handleCredentials = async (e: React.FormEvent) => {

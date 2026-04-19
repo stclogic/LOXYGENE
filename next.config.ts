@@ -1,29 +1,33 @@
-import type { NextConfig } from "next";
+import type { NextConfig } from 'next'
 
 const nextConfig: NextConfig = {
-  reactStrictMode: true,
-  // Explicitly opt-in to Turbopack (default in Next.js 16) — silences mixed-config warning
+  experimental: {
+    serverActions: {
+      allowedOrigins: ['loxygene.netlify.app', 'localhost:3000'],
+    },
+  },
   turbopack: {},
   images: {
     remotePatterns: [
-      { protocol: "https", hostname: "img.youtube.com" },
-      { protocol: "https", hostname: "i.ytimg.com" },
-      { protocol: "https", hostname: "blogger.googleusercontent.com" },
-      { protocol: "https", hostname: "lh3.googleusercontent.com" },
+      { protocol: 'https', hostname: 'img.youtube.com' },
+      { protocol: 'https', hostname: 'i.ytimg.com' },
+      { protocol: 'https', hostname: 'blogger.googleusercontent.com' },
+      { protocol: 'https', hostname: 'lh3.googleusercontent.com' },
+      { protocol: 'https', hostname: 'k.kakaocdn.net' },
     ],
   },
   async headers() {
     return [
       {
-        source: "/rooms/:path*",
+        source: '/rooms/:path*',
         headers: [
           {
-            key: "Permissions-Policy",
-            value: "camera=*, microphone=*, display-capture=*",
+            key: 'Permissions-Policy',
+            value: 'camera=*, microphone=*, display-capture=*',
           },
         ],
       },
-    ];
+    ]
   },
   webpack: (config) => {
     config.resolve.fallback = {
@@ -31,9 +35,9 @@ const nextConfig: NextConfig = {
       fs: false,
       net: false,
       tls: false,
-    };
-    return config;
+    }
+    return config
   },
-};
+}
 
-export default nextConfig;
+export default nextConfig

@@ -237,6 +237,22 @@ export function PartyRoomShell({
   const hostVideoRef = useRef<HTMLVideoElement>(null);
   const [hiddenParticipants, setHiddenParticipants] = useState<Set<string>>(new Set());
 
+  // Guest dock dim toggle
+  const [dimmedDockItems, setDimmedDockItems] = useState<Set<string>>(new Set());
+
+  // Host video panel (camera mode — floating & resizable)
+  const [videoPanelSize, setVideoPanelSize] = useState({ w: 0, h: 0 }); // 0 = not yet initialised
+  const [videoPanelPos, setVideoPanelPos] = useState({ x: 0, y: 0 });
+  const videoDragging = useRef(false);
+  const videoDragOrigin = useRef({ mx: 0, my: 0, px: 0, py: 0 });
+  const videoResizing = useRef(false);
+  const videoResizeOrigin = useRef({ mx: 0, my: 0, w: 0, h: 0 });
+
+  // Floating karaoke panel size (resizable)
+  const [panelSize, setPanelSize] = useState({ w: 360, h: 500 });
+  const panelResizing = useRef(false);
+  const panelResizeOrigin = useRef({ mx: 0, my: 0, w: 0, h: 0 });
+
 
   // Item VFX
   const [vfxParticles, setVfxParticles] = useState<{ id: number; emoji: string; x: number }[]>([]);
@@ -385,19 +401,134 @@ export function PartyRoomShell({
     window.addEventListener("mouseup", onUp);
   };
 
+  // ── Initialise video panel size once on mount ────────────────────────────
+  useEffect(() => {
+    const w = Math.round(Math.min(640, window.innerWidth * 0.55));
+    const h = Math.round(w * 9 / 16);
+    setVideoPanelSize({ w, h });
+    setVideoPanelPos({ x: Math.round((window.innerWidth - w) / 2), y: 80 });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ── Guest dock dim toggle ────────────────────────────────────────────────
+  const toggleDockDim = (pid: string) => {
+    setDimmedDockItems(prev => {
+      const next = new Set(prev);
+      next.has(pid) ? next.delete(pid) : next.add(pid);
+      return next;
+    });
+  };
+
+  // ── Video panel drag ─────────────────────────────────────────────────────
+  const startVideoDrag = (e: React.MouseEvent) => {
+    videoDragging.current = true;
+    videoDragOrigin.current = { mx: e.clientX, my: e.clientY, px: videoPanelPos.x, py: videoPanelPos.y };
+    e.preventDefault();
+    const onMove = (ev: MouseEvent) => {
+      if (!videoDragging.current) return;
+      setVideoPanelPos({
+        x: Math.max(0, Math.min(window.innerWidth  - videoPanelSize.w, videoDragOrigin.current.px + ev.clientX - videoDragOrigin.current.mx)),
+        y: Math.max(0, Math.min(window.innerHeight - videoPanelSize.h, videoDragOrigin.current.py + ev.clientY - videoDragOrigin.current.my)),
+      });
+    };
+    const onUp = () => { videoDragging.current = false; window.removeEventListener("mousemove", onMove); window.removeEventListener("mouseup", onUp); };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  };
+
+  // ── Video panel resize (16:9 locked) ────────────────────────────────────
+  const startVideoResize = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    videoResizing.current = true;
+    videoResizeOrigin.current = { mx: e.clientX, my: e.clientY, w: videoPanelSize.w, h: videoPanelSize.h };
+    const onMove = (ev: MouseEvent) => {
+      if (!videoResizing.current) return;
+      const rawW = videoResizeOrigin.current.w + ev.clientX - videoResizeOrigin.current.mx;
+      const w = Math.max(240, Math.min(window.innerWidth * 0.92, rawW));
+      setVideoPanelSize({ w, h: Math.round(w * 9 / 16) });
+    };
+    const onUp = () => { videoResizing.current = false; window.removeEventListener("mousemove", onMove); window.removeEventListener("mouseup", onUp); };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  };
+
+  // ── Karaoke panel resize ─────────────────────────────────────────────────
+  const startPanelResize = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    if (!panelDragged) {
+      const rect = panelRef.current?.getBoundingClientRect();
+      if (rect) setPanelPos({ x: rect.left, y: rect.top });
+      setPanelDragged(true);
+    }
+    panelResizing.current = true;
+    panelResizeOrigin.current = { mx: e.clientX, my: e.clientY, w: panelSize.w, h: panelSize.h };
+    const onMove = (ev: MouseEvent) => {
+      if (!panelResizing.current) return;
+      setPanelSize({
+        w: Math.max(280, Math.min(window.innerWidth  - 24, panelResizeOrigin.current.w + ev.clientX - panelResizeOrigin.current.mx)),
+        h: Math.max(320, Math.min(window.innerHeight - 80, panelResizeOrigin.current.h + ev.clientY - panelResizeOrigin.current.my)),
+      });
+    };
+    const onUp = () => { panelResizing.current = false; window.removeEventListener("mousemove", onMove); window.removeEventListener("mouseup", onUp); };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  };
+
   return (
     <>
     <div className="fixed inset-0 flex flex-col bg-[#070707] overflow-hidden">
 
       {/* ── FULL-SCREEN HOST STAGE BACKGROUND ── */}
       <div className="absolute inset-0 z-0">
-        {bgMode === "camera" && hostStream ? (
-          <video ref={hostVideoRef} autoPlay muted playsInline className="absolute inset-0 w-full h-full object-cover" />
-        ) : (
+        {/* Gradient always fills the backdrop */}
+        <div
+          className="absolute inset-0"
+          style={{ background: `linear-gradient(135deg, ${selectedBg.from}, ${selectedBg.via}, ${selectedBg.to})` }}
+        />
+
+        {/* Camera panel — floating & resizable over the gradient */}
+        {bgMode === "camera" && hostStream && videoPanelSize.w > 0 && (
           <div
-            className="absolute inset-0"
-            style={{ background: `linear-gradient(135deg, ${selectedBg.from}, ${selectedBg.via}, ${selectedBg.to})` }}
-          />
+            className="absolute overflow-hidden"
+            style={{
+              left: videoPanelPos.x,
+              top:  videoPanelPos.y,
+              width:  videoPanelSize.w,
+              height: videoPanelSize.h,
+              borderRadius: 14,
+              boxShadow: "0 16px 64px rgba(0,0,0,0.7), 0 0 0 1.5px rgba(255,255,255,0.14)",
+              transition: "box-shadow 0.3s ease",
+              zIndex: 5,
+            }}
+          >
+            <video
+              ref={hostVideoRef}
+              autoPlay
+              muted
+              playsInline
+              className="absolute inset-0 w-full h-full object-cover"
+            />
+            {/* Drag bar — top gradient overlay */}
+            <div
+              className="absolute top-0 left-0 right-0 h-8 flex items-center px-2.5 cursor-move select-none"
+              style={{ background: "linear-gradient(to bottom, rgba(0,0,0,0.55) 0%, transparent 100%)" }}
+              onMouseDown={startVideoDrag}
+            >
+              <Icon icon="solar:hamburger-menu-bold" className="w-3 h-3 text-white/40" />
+            </div>
+            {/* Resize handle — SE corner */}
+            <div
+              className="absolute bottom-0 right-0 w-7 h-7 flex items-end justify-end p-1.5 cursor-se-resize"
+              onMouseDown={startVideoResize}
+            >
+              <svg width="10" height="10" viewBox="0 0 10 10">
+                <line x1="2" y1="10" x2="10" y2="2" stroke="rgba(255,255,255,0.45)" strokeWidth="1.5" strokeLinecap="round"/>
+                <line x1="6" y1="10" x2="10" y2="6" stroke="rgba(255,255,255,0.45)" strokeWidth="1.5" strokeLinecap="round"/>
+              </svg>
+            </div>
+          </div>
         )}
         {/* YouTube karaoke embed — show whenever a video ID is set */}
         {karaokeVideoId ? (
@@ -578,8 +709,13 @@ export function PartyRoomShell({
                 <div
                   key={p.id}
                   className="relative flex-shrink-0 flex flex-col items-center gap-0.5 cursor-pointer group"
-                  style={{ width: 56 }}
-                  onClick={e => { e.stopPropagation(); if (!hidden) setContextMenu({ x: e.clientX, y: e.clientY, pid: p.id }); }}
+                  style={{
+                    width: 56,
+                    opacity: hidden ? 0.35 : dimmedDockItems.has(p.id) ? 0.45 : 1,
+                    transition: "opacity 0.25s ease",
+                  }}
+                  onClick={e => { e.stopPropagation(); if (!hidden) toggleDockDim(p.id); }}
+                  onContextMenu={e => { e.preventDefault(); e.stopPropagation(); if (!hidden) setContextMenu({ x: e.clientX, y: e.clientY, pid: p.id }); }}
                 >
                   {/* Avatar tile */}
                   <div
@@ -589,7 +725,6 @@ export function PartyRoomShell({
                       border: `1.5px solid ${isSpot ? "rgba(0,229,255,0.7)" : p.isKaraoke ? "rgba(236,72,153,0.7)" : "rgba(255,255,255,0.1)"}`,
                       boxShadow: isSpot ? "0 0 12px rgba(0,229,255,0.35)" : "none",
                       backdropFilter: "blur(8px)",
-                      opacity: hidden ? 0.35 : 1,
                     }}
                   >
                     {hidden ? (
@@ -690,8 +825,8 @@ export function PartyRoomShell({
             ...(panelDragged
               ? { left: panelPos.x, top: panelPos.y }
               : { right: 12, bottom: 72 }),
-            width: "min(360px, 92vw)",
-            maxHeight: "60vh",
+            width: panelSize.w,
+            height: panelSize.h,
             background: "rgba(4,4,14,0.93)",
             border: "1px solid rgba(255,255,255,0.1)",
             backdropFilter: "blur(24px)",
@@ -708,12 +843,23 @@ export function PartyRoomShell({
               <Icon icon="solar:cursor-bold" className="w-3 h-3 text-white/20" />
               <span className="text-xs font-bold text-white/70">{panelTitle}</span>
             </div>
-            <button onClick={() => setPanelOpen(false)} className="text-white/30 hover:text-white/60 transition-colors ml-2">
+            <button type="button" aria-label="패널 닫기" onClick={() => setPanelOpen(false)} className="text-white/30 hover:text-white/60 transition-colors ml-2">
               <Icon icon="solar:close-circle-linear" className="w-4 h-4" />
             </button>
           </div>
           <div className="overflow-y-auto flex-1" style={{ scrollbarWidth: "none" }}>
             {panelContent}
+          </div>
+          {/* SE resize handle */}
+          <div
+            className="absolute bottom-0 right-0 w-7 h-7 flex items-end justify-end p-1.5 cursor-se-resize z-10"
+            onMouseDown={startPanelResize}
+            title="크기 조절"
+          >
+            <svg width="10" height="10" viewBox="0 0 10 10">
+              <line x1="2" y1="10" x2="10" y2="2" stroke="rgba(255,255,255,0.25)" strokeWidth="1.5" strokeLinecap="round"/>
+              <line x1="6" y1="10" x2="10" y2="6" stroke="rgba(255,255,255,0.25)" strokeWidth="1.5" strokeLinecap="round"/>
+            </svg>
           </div>
         </div>
       )}

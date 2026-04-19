@@ -39,6 +39,8 @@ interface Props {
   karaokeLyrics?: string[];
   roomId?: string;
   nickname?: string;
+  onToggleMic?: () => void;
+  onToggleCamera?: () => void;
 }
 
 // ── In-room mini settings components ──────────────────────────────────────
@@ -163,7 +165,7 @@ function InRoomLightingSettings() {
 
 // ──────────────────────────────────────────────────────────────────────────
 
-function VideoTile({ track, name }: { track?: MediaStreamTrack | null; name: string }) {
+function VideoTile({ track, name, className }: { track?: MediaStreamTrack | null; name: string; className?: string }) {
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
@@ -172,15 +174,17 @@ function VideoTile({ track, name }: { track?: MediaStreamTrack | null; name: str
   }, [track]);
 
   return (
-    <div className="h-16 relative flex items-center justify-center overflow-hidden">
+    <div className={`relative flex items-center justify-center overflow-hidden ${className ?? "h-16"}`}>
       {track ? (
         <video ref={videoRef} autoPlay muted playsInline className="w-full h-full object-cover" />
       ) : (
         <span className="text-2xl">👤</span>
       )}
-      <span className="absolute bottom-0.5 left-0 right-0 text-[9px] text-white/70 truncate text-center px-1 leading-tight">
-        {name}
-      </span>
+      {name && (
+        <span className="absolute bottom-0.5 left-0 right-0 text-[9px] text-white/70 truncate text-center px-1 leading-tight">
+          {name}
+        </span>
+      )}
     </div>
   );
 }
@@ -199,8 +203,10 @@ export function PartyRoomShell({
   karaokeLyrics = [],
   roomId = "default",
   nickname = "게스트",
+  onToggleMic,
+  onToggleCamera,
 }: Props) {
-  const [micOn, setMicOn] = useState(false);
+  const [micOn, setMicOn] = useState(true); // start ON — Daily also starts with audio enabled
   const [camOn, setCamOn] = useState(true);
   const [chatOpen, setChatOpen] = useState(false);
   const [panelOpen, setPanelOpen] = useState(false);
@@ -545,8 +551,15 @@ export function PartyRoomShell({
               />
             </div>
           </div>
+        ) : spotlighted && dailyParticipants?.[spotlighted]?.tracks?.video?.persistentTrack ? (
+          /* Spotlighted participant's live Daily.co video — fills the stage */
+          <VideoTile
+            track={dailyParticipants[spotlighted].tracks.video.persistentTrack}
+            name={spotlightedName}
+            className="absolute inset-0"
+          />
         ) : (
-          /* Mock camera silhouette */
+          /* Default silhouette when no spotlight / no karaoke */
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none">
             <span className="text-[18vw] opacity-[0.04]">{spotlightedP ? "👤" : "🎙️"}</span>
           </div>
@@ -731,6 +744,8 @@ export function PartyRoomShell({
                   >
                     {hidden ? (
                       <Icon icon="solar:eye-slash-bold" className="w-4 h-4 text-white/20" />
+                    ) : p.track ? (
+                      <VideoTile track={p.track} name="" className="absolute inset-0" />
                     ) : (
                       <span className="text-xl">👤</span>
                     )}
@@ -1016,7 +1031,7 @@ export function PartyRoomShell({
       >
         {/* Camera */}
         <button
-          onClick={() => setCamOn(v => !v)}
+          onClick={() => { setCamOn(v => !v); onToggleCamera?.(); }}
           className="w-12 h-12 rounded-xl flex items-center justify-center transition-all active:scale-90 flex-shrink-0"
           style={{
             background: camOn ? "rgba(0,229,255,0.1)" : "rgba(239,68,68,0.1)",
@@ -1029,7 +1044,7 @@ export function PartyRoomShell({
         {/* Mic */}
         <div className="relative flex-shrink-0" title={IS_FREE ? "유료 회원 전용" : undefined}>
           <button
-            onClick={() => { if (!IS_FREE) setMicOn(v => !v); }}
+            onClick={() => { if (!IS_FREE) { setMicOn(v => !v); onToggleMic?.(); } }}
             className="w-12 h-12 rounded-xl flex items-center justify-center transition-all active:scale-90"
             style={{
               background: IS_FREE ? "rgba(255,255,255,0.03)" : micOn ? "rgba(0,229,255,0.1)" : "rgba(239,68,68,0.1)",

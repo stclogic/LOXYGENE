@@ -208,7 +208,7 @@ export default function ColosseumRoomPage({ params }: { params: { roomId: string
   const [kaoraokeLyrics, setKaraokeLyrics] = useState<string[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const { participants: dailyParticipants } = useDailyCall(dailyRoomUrl, dailyToken);
+  const { participants: dailyParticipants, toggleMic, toggleCamera } = useDailyCall(dailyRoomUrl, dailyToken);
 
   useEffect(() => {
     if (!hasNickname()) {
@@ -265,6 +265,8 @@ export default function ColosseumRoomPage({ params }: { params: { roomId: string
         dailyParticipants={dailyParticipants}
         roomId={params.roomId}
         nickname={currentNickname}
+        onToggleMic={toggleMic}
+        onToggleCamera={toggleCamera}
       />
 
       {/* Nickname entry modal */}

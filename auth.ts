@@ -1,5 +1,6 @@
 import NextAuth from 'next-auth'
 import CredentialsProvider from 'next-auth/providers/credentials'
+import { isSuperAdmin } from '@/lib/admin'
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   trustHost: true,
@@ -107,12 +108,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (user) {
         token.id = user.id
         token.name = user.name
+        token.isSuperAdmin = isSuperAdmin(user.email)
       }
       return token
     },
     async session({ session, token }) {
       if (token && session.user) {
         session.user.id = token.id as string
+        session.user.isSuperAdmin = token.isSuperAdmin ?? false
       }
       return session
     },

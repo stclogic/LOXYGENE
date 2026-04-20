@@ -5,6 +5,7 @@ import { Icon } from "@iconify/react";
 import { PartyRoomShell } from "@/components/room/PartyRoomShell";
 import { hasNickname, setUserNickname, randomNickname, getUserNickname } from "@/lib/utils/userSession";
 import { useDailyCall } from "@/hooks/useDailyCall";
+import { useIsAdmin } from "@/hooks/useIsAdmin";
 
 const MOCK_LYRICS = [
   { text: "사랑했지만 이제는 모두 지나간 일", active: false },
@@ -208,6 +209,7 @@ export default function ColosseumRoomPage({ params }: { params: { roomId: string
   const [kaoraokeLyrics, setKaraokeLyrics] = useState<string[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  const isSuperAdmin = useIsAdmin();
   const { participants: dailyParticipants, toggleMic, toggleCamera } = useDailyCall(dailyRoomUrl, dailyToken);
 
   useEffect(() => {
@@ -265,6 +267,7 @@ export default function ColosseumRoomPage({ params }: { params: { roomId: string
         dailyParticipants={dailyParticipants}
         roomId={params.roomId}
         nickname={currentNickname}
+        isSuperAdmin={isSuperAdmin}
         onToggleMic={toggleMic}
         onToggleCamera={toggleCamera}
       />

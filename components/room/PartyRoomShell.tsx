@@ -39,6 +39,7 @@ interface Props {
   karaokeLyrics?: string[];
   roomId?: string;
   nickname?: string;
+  isSuperAdmin?: boolean;
   onToggleMic?: () => void;
   onToggleCamera?: () => void;
 }
@@ -302,6 +303,7 @@ export function PartyRoomShell({
   karaokeLyrics = [],
   roomId = "default",
   nickname = "게스트",
+  isSuperAdmin = false,
   onToggleMic,
   onToggleCamera,
 }: Props) {
@@ -314,7 +316,9 @@ export function PartyRoomShell({
   const [selectedBg, setSelectedBg] = useState(BG_OPTIONS[0]);
   const [spotlighted, setSpotlighted] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; pid: string } | null>(null);
-  const [isHost] = useState(true);
+  const isHost = isSuperAdmin || true; // TODO: derive from session role
+  const [adminToast, setAdminToast] = useState("");
+  const [forceCloseConfirm, setForceCloseConfirm] = useState(false);
   const [bannerDismissed, setBannerDismissed] = useState(false);
   const [allMuted, setAllMuted] = useState(false);
   const [karaokeOn, setKaraokeOn] = useState(false);
@@ -724,6 +728,12 @@ export function PartyRoomShell({
             <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse block" />
             <span className="text-[10px] text-red-400 font-semibold">LIVE</span>
           </div>
+          {isSuperAdmin && (
+            <div className="flex items-center gap-1 px-2 py-1 rounded-full" style={{ background: "rgba(255,215,0,0.15)", border: "1px solid rgba(255,215,0,0.4)" }}>
+              <Icon icon="solar:shield-keyhole-bold" className="w-3 h-3 text-yellow-300" />
+              <span className="text-[10px] text-yellow-300 font-bold">ADMIN</span>
+            </div>
+          )}
           <div className="flex items-center gap-1">
             <Icon icon="solar:user-bold" className="text-white/30 w-3.5 h-3.5" />
             <span className="text-white/50 text-xs">{participantCount}</span>
@@ -792,6 +802,15 @@ export function PartyRoomShell({
           >
             🎯 참여자 선택
           </button>
+          {isSuperAdmin && (
+            <button
+              onClick={() => setForceCloseConfirm(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium transition-all flex-shrink-0"
+              style={{ background: "rgba(239,68,68,0.15)", border: "1px solid rgba(239,68,68,0.4)", color: "#ef4444" }}
+            >
+              🔴 방 강제종료
+            </button>
+          )}
         </div>
       )}
 
@@ -917,7 +936,23 @@ export function PartyRoomShell({
                 label: hiddenParticipants.has(contextMenu.pid) ? "화면 보이기" : "화면 숨기기",
                 action: () => toggleParticipantVisibility(contextMenu.pid),
               },
-              { icon: "solar:user-block-rounded-bold", label: "내보내기",              action: () => {}, danger: true },
+              {
+                icon: "solar:user-block-rounded-bold",
+                label: "내보내기",
+                danger: true,
+                action: async () => {
+                  if (!isSuperAdmin) return;
+                  try {
+                    await fetch("/api/admin/kick", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ roomId, userId: contextMenu.pid }),
+                    });
+                    setAdminToast("⚡ 참여자를 내보냈어요");
+                    setTimeout(() => setAdminToast(""), 3000);
+                  } catch { /* non-blocking */ }
+                },
+              },
             ].map(item => (
               <button
                 key={item.label}
@@ -1320,6 +1355,56 @@ export function PartyRoomShell({
           </div>
         </div>
       </>
+    )}
+
+    {/* ── ADMIN: Force-close confirmation modal ── */}
+    {forceCloseConfirm && (
+      <div className="fixed inset-0 z-[70] flex items-center justify-center px-4" style={{ background: "rgba(0,0,0,0.88)", backdropFilter: "blur(16px)" }}>
+        <div className="w-full max-w-sm rounded-2xl p-7 flex flex-col gap-5" style={{ background: "rgba(8,4,4,0.99)", border: "1px solid rgba(239,68,68,0.35)", boxShadow: "0 0 40px rgba(239,68,68,0.12)" }}>
+          <div className="text-center">
+            <span className="text-3xl">⚠️</span>
+            <h2 className="text-white font-black text-base mt-2">방을 강제 종료할까요?</h2>
+            <p className="text-white/40 text-xs mt-1.5">모든 참여자가 즉시 퇴장되며 되돌릴 수 없습니다.</p>
+          </div>
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={() => setForceCloseConfirm(false)}
+              className="flex-1 py-2.5 rounded-xl text-sm font-medium"
+              style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.5)" }}
+            >
+              취소
+            </button>
+            <button
+              type="button"
+              onClick={async () => {
+                setForceCloseConfirm(false);
+                try {
+                  await fetch("/api/admin/force-close", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ roomId }),
+                  });
+                  setAdminToast("⚡ 방을 강제 종료했어요");
+                  setTimeout(() => setAdminToast(""), 3000);
+                } catch { /* non-blocking */ }
+              }}
+              className="flex-1 py-2.5 rounded-xl text-sm font-black"
+              style={{ background: "rgba(239,68,68,0.18)", border: "1px solid rgba(239,68,68,0.5)", color: "#ef4444" }}
+            >
+              강제 종료
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* ── ADMIN toast ── */}
+    {adminToast && (
+      <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[60] px-5 py-3 rounded-2xl text-sm font-semibold text-yellow-300 whitespace-nowrap pointer-events-none"
+        style={{ background: "rgba(0,0,0,0.92)", border: "1px solid rgba(255,215,0,0.3)", backdropFilter: "blur(20px)", boxShadow: "0 8px 32px rgba(0,0,0,0.5)" }}>
+        {adminToast}
+      </div>
     )}
 
     {/* F&B floating toast */}

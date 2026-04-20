@@ -9,6 +9,7 @@ declare module "next-auth" {
       role: string;
       coins: number;
       avatar_url?: string;
+      isSuperAdmin?: boolean;
     } & DefaultSession["user"];
   }
 
@@ -27,5 +28,6 @@ declare module "next-auth/jwt" {
     role?: string;
     coins?: number;
     avatar_url?: string;
+    isSuperAdmin?: boolean;
   }
 }

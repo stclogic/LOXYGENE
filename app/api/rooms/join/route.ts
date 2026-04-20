@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import { auth } from "@/auth";
 import { getSupabaseServer } from "@/lib/supabase/supabaseServer";
 import { createDailyToken } from "@/lib/daily";
+import { isSuperAdmin } from "@/lib/admin";
 
 const bodySchema = z.object({
   roomId: z.string().min(1),
@@ -23,12 +24,14 @@ export async function POST(req: NextRequest) {
 
   const { roomId, password } = parsed.data;
   const userId = session.user.id as string;
-  const userName = (session.user.name ?? session.user.email ?? "게스트") as string;
+  const userEmail = session.user.email ?? "";
+  const userName = (session.user.name ?? userEmail ?? "게스트") as string;
+  const isAdmin = isSuperAdmin(userEmail);
   const supabase = getSupabaseServer();
 
   // Fallback: no Supabase — return mock token
   if (!supabase) {
-    return NextResponse.json({ roomId, type: "colosseum", role: "participant", dailyToken: null, dailyRoomUrl: null, isMock: true });
+    return NextResponse.json({ roomId, type: "colosseum", role: isAdmin ? "host" : "participant", isSuperAdmin: isAdmin, dailyToken: null, dailyRoomUrl: null, isMock: true });
   }
 
   // Fetch room
@@ -42,28 +45,30 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Room not found" }, { status: 404 });
   }
 
-  if (!room.is_active) {
-    return NextResponse.json({ error: "Room is no longer active" }, { status: 410 });
-  }
+  if (!isAdmin) {
+    if (!room.is_active) {
+      return NextResponse.json({ error: "Room is no longer active" }, { status: 410 });
+    }
 
-  // Check participant count
-  const { count } = await supabase
-    .from("room_participants")
-    .select("id", { count: "exact", head: true })
-    .eq("room_id", roomId)
-    .is("left_at", null);
+    // Check participant count
+    const { count } = await supabase
+      .from("room_participants")
+      .select("id", { count: "exact", head: true })
+      .eq("room_id", roomId)
+      .is("left_at", null);
 
-  if ((count ?? 0) >= room.max_participants) {
-    return NextResponse.json({ error: "Room is full" }, { status: 409 });
-  }
+    if ((count ?? 0) >= room.max_participants) {
+      return NextResponse.json({ error: "Room is full" }, { status: 409 });
+    }
 
-  // Password check
-  if (room.password_hash && !password) {
-    return NextResponse.json({ error: "Password required" }, { status: 403 });
-  }
-  if (room.password_hash && password) {
-    const ok = await bcrypt.compare(password, room.password_hash as string);
-    if (!ok) return NextResponse.json({ error: "Invalid password" }, { status: 403 });
+    // Password check
+    if (room.password_hash && !password) {
+      return NextResponse.json({ error: "Password required" }, { status: 403 });
+    }
+    if (room.password_hash && password) {
+      const ok = await bcrypt.compare(password, room.password_hash as string);
+      if (!ok) return NextResponse.json({ error: "Invalid password" }, { status: 403 });
+    }
   }
 
   // Check existing participant row (host was pre-inserted)
@@ -74,20 +79,20 @@ export async function POST(req: NextRequest) {
     .eq("user_id", userId)
     .single();
 
-  const role: string = existing?.role ?? "participant";
+  // Super admin always joins as host
+  const role: string = isAdmin ? "host" : (existing?.role ?? "participant");
 
   if (existing) {
-    // Restore if previously left
     await supabase
       .from("room_participants")
-      .update({ left_at: null })
+      .update({ left_at: null, ...(isAdmin ? { role: "host" } : {}) })
       .eq("room_id", roomId)
       .eq("user_id", userId);
   } else {
     await supabase.from("room_participants").insert({
       room_id: roomId,
       user_id: userId,
-      role: "participant",
+      role,
     });
   }
 
@@ -98,12 +103,13 @@ export async function POST(req: NextRequest) {
 
   if (dailyRoomName) {
     try {
-      const tokenData = await createDailyToken(dailyRoomName, userId, userName, role === "host");
+      // Super admin always gets isOwner:true
+      const tokenData = await createDailyToken(dailyRoomName, userId, userName, isAdmin || role === "host");
       dailyToken = tokenData.token;
     } catch {
       // Daily.co not configured
     }
   }
 
-  return NextResponse.json({ roomId, type: room.room_type, role, dailyToken, dailyRoomUrl });
+  return NextResponse.json({ roomId, type: room.room_type, role, isSuperAdmin: isAdmin, dailyToken, dailyRoomUrl });
 }

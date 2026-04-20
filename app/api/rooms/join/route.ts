@@ -79,8 +79,22 @@ export async function POST(req: NextRequest) {
     .eq("user_id", userId)
     .single();
 
-  // Super admin always joins as host
-  const role: string = isAdmin ? "host" : (existing?.role ?? "participant");
+  // Determine role: admin always host; returning user keeps role; first-joiner with purchase history → host
+  let role: string = isAdmin ? "host" : (existing?.role ?? "participant");
+  if (!isAdmin && !existing) {
+    const { count: activeCount } = await supabase
+      .from("room_participants")
+      .select("id", { count: "exact", head: true })
+      .eq("room_id", roomId)
+      .is("left_at", null);
+    if ((activeCount ?? 0) === 0) {
+      const { count: purchaseCount } = await supabase
+        .from("item_transactions")
+        .select("id", { count: "exact", head: true })
+        .eq("sender_id", userId);
+      if ((purchaseCount ?? 0) > 0) role = "host";
+    }
+  }
 
   if (existing) {
     await supabase

@@ -40,6 +40,7 @@ interface Props {
   roomId?: string;
   nickname?: string;
   isSuperAdmin?: boolean;
+  role?: string;
   onToggleMic?: () => void;
   onToggleCamera?: () => void;
 }
@@ -304,6 +305,7 @@ export function PartyRoomShell({
   roomId = "default",
   nickname = "게스트",
   isSuperAdmin = false,
+  role,
   onToggleMic,
   onToggleCamera,
 }: Props) {
@@ -315,8 +317,9 @@ export function PartyRoomShell({
   const [bgPickerOpen, setBgPickerOpen] = useState(false);
   const [selectedBg, setSelectedBg] = useState(BG_OPTIONS[0]);
   const [spotlighted, setSpotlighted] = useState<string | null>(null);
-  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; pid: string } | null>(null);
-  const isHost = isSuperAdmin || true; // TODO: derive from session role
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; pid: string; name: string } | null>(null);
+  const [transferHostConfirm, setTransferHostConfirm] = useState<{ pid: string; name: string } | null>(null);
+  const isHost = isSuperAdmin || role === "host";
   const [adminToast, setAdminToast] = useState("");
   const [forceCloseConfirm, setForceCloseConfirm] = useState(false);
   const [bannerDismissed, setBannerDismissed] = useState(false);
@@ -723,7 +726,7 @@ export function PartyRoomShell({
           {roomSubtitle && <p className="text-white/30 text-[10px] mt-0.5">{roomSubtitle}</p>}
         </div>
         <div className="flex items-center gap-2">
-          <YouTubeBackgroundPlayer videoId="vh9pvpFK8bE" />
+          <YouTubeBackgroundPlayer videoId="9MYpxt-0xwY" />
           <div className="flex items-center gap-1 px-2 py-1 rounded-full" style={{ background: "rgba(239,68,68,0.15)", border: "1px solid rgba(239,68,68,0.3)" }}>
             <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse block" />
             <span className="text-[10px] text-red-400 font-semibold">LIVE</span>
@@ -849,7 +852,7 @@ export function PartyRoomShell({
                     transition: "opacity 0.3s ease, filter 0.3s ease",
                   }}
                   onClick={e => { e.stopPropagation(); if (!hidden) toggleDockDim(p.id); }}
-                  onContextMenu={e => { e.preventDefault(); e.stopPropagation(); if (!hidden) setContextMenu({ x: e.clientX, y: e.clientY, pid: p.id }); }}
+                  onContextMenu={e => { e.preventDefault(); e.stopPropagation(); if (!hidden) setContextMenu({ x: e.clientX, y: e.clientY, pid: p.id, name: p.name }); }}
                 >
                   {/* Avatar tile */}
                   <div
@@ -936,6 +939,11 @@ export function PartyRoomShell({
                 label: hiddenParticipants.has(contextMenu.pid) ? "화면 보이기" : "화면 숨기기",
                 action: () => toggleParticipantVisibility(contextMenu.pid),
               },
+              ...(isHost ? [{
+                icon: "solar:crown-bold",
+                label: "호스트 양도",
+                action: () => setTransferHostConfirm({ pid: contextMenu.pid, name: contextMenu.name }),
+              }] : []),
               {
                 icon: "solar:user-block-rounded-bold",
                 label: "내보내기",
@@ -1393,6 +1401,51 @@ export function PartyRoomShell({
               style={{ background: "rgba(239,68,68,0.18)", border: "1px solid rgba(239,68,68,0.5)", color: "#ef4444" }}
             >
               강제 종료
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* ── Host transfer confirmation modal ── */}
+    {transferHostConfirm && (
+      <div className="fixed inset-0 z-[70] flex items-center justify-center px-4" style={{ background: "rgba(0,0,0,0.88)", backdropFilter: "blur(16px)" }}>
+        <div className="w-full max-w-sm rounded-2xl p-7 flex flex-col gap-5" style={{ background: "rgba(4,4,14,0.99)", border: "1px solid rgba(255,215,0,0.3)", boxShadow: "0 0 40px rgba(255,215,0,0.08)" }}>
+          <div className="text-center">
+            <span className="text-3xl">👑</span>
+            <h2 className="text-white font-black text-base mt-2">호스트를 양도할까요?</h2>
+            <p className="text-white/40 text-xs mt-1.5">
+              <span className="text-yellow-300 font-semibold">{transferHostConfirm.name}</span>님이 새 호스트가 됩니다.
+            </p>
+          </div>
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={() => setTransferHostConfirm(null)}
+              className="flex-1 py-2.5 rounded-xl text-sm font-medium"
+              style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.5)" }}
+            >
+              취소
+            </button>
+            <button
+              type="button"
+              onClick={async () => {
+                const { pid, name } = transferHostConfirm;
+                setTransferHostConfirm(null);
+                try {
+                  await fetch("/api/rooms/transfer-host", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ roomId, newHostId: pid }),
+                  });
+                  setAdminToast(`👑 ${name}님에게 호스트를 양도했어요`);
+                  setTimeout(() => setAdminToast(""), 3000);
+                } catch { /* non-blocking */ }
+              }}
+              className="flex-1 py-2.5 rounded-xl text-sm font-black"
+              style={{ background: "rgba(255,215,0,0.12)", border: "1px solid rgba(255,215,0,0.4)", color: "#FFD700" }}
+            >
+              양도하기
             </button>
           </div>
         </div>

@@ -205,6 +205,7 @@ export default function ColosseumRoomPage({ params }: { params: { roomId: string
   const [currentNickname, setCurrentNickname] = useState("게스트");
   const [dailyToken, setDailyToken] = useState("");
   const [dailyRoomUrl, setDailyRoomUrl] = useState("");
+  const [role, setRole] = useState<string>("participant");
   const [karaokeVideoId, setKaraokeVideoId] = useState<string | null>(null);
   const [kaoraokeLyrics, setKaraokeLyrics] = useState<string[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -231,6 +232,7 @@ export default function ColosseumRoomPage({ params }: { params: { roomId: string
         if (!data) return;
         if (data.dailyToken) setDailyToken(data.dailyToken);
         if (data.dailyRoomUrl) setDailyRoomUrl(data.dailyRoomUrl);
+        if (data.role) setRole(data.role);
       })
       .catch(console.error);
   }, [params.roomId]);
@@ -268,6 +270,7 @@ export default function ColosseumRoomPage({ params }: { params: { roomId: string
         roomId={params.roomId}
         nickname={currentNickname}
         isSuperAdmin={isSuperAdmin}
+        role={role}
         onToggleMic={toggleMic}
         onToggleCamera={toggleCamera}
       />

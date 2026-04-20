@@ -124,6 +124,7 @@ export default function VarietyRoomPage({ params }: { params: Promise<{ roomId: 
   const paramsRef = useRef<{ roomId: string } | null>(null);
   const [dailyToken, setDailyToken] = useState("");
   const [dailyRoomUrl, setDailyRoomUrl] = useState("");
+  const [role, setRole] = useState<string>("participant");
 
   const { participants: dailyParticipants } = useDailyCall(dailyRoomUrl, dailyToken);
 
@@ -140,6 +141,7 @@ export default function VarietyRoomPage({ params }: { params: Promise<{ roomId: 
           if (!data) return;
           if (data.dailyToken) setDailyToken(data.dailyToken);
           if (data.dailyRoomUrl) setDailyRoomUrl(data.dailyRoomUrl);
+          if (data.role) setRole(data.role);
         })
         .catch(console.error);
     });
@@ -171,6 +173,7 @@ export default function VarietyRoomPage({ params }: { params: Promise<{ roomId: 
       panelContent={<GamePanelContent />}
       extraBarControls={buzzer}
       dailyParticipants={dailyParticipants}
+      role={role}
     />
   );
 }

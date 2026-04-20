@@ -144,6 +144,7 @@ export default function DJRoomPage({ params }: { params: Promise<{ roomId: strin
   const reactionIdRef = useRef(0);
   const [dailyToken, setDailyToken] = useState("");
   const [dailyRoomUrl, setDailyRoomUrl] = useState("");
+  const [role, setRole] = useState<string>("participant");
 
   const { participants: dailyParticipants } = useDailyCall(dailyRoomUrl, dailyToken);
 
@@ -159,6 +160,7 @@ export default function DJRoomPage({ params }: { params: Promise<{ roomId: strin
           if (!data) return;
           if (data.dailyToken) setDailyToken(data.dailyToken);
           if (data.dailyRoomUrl) setDailyRoomUrl(data.dailyRoomUrl);
+          if (data.role) setRole(data.role);
         })
         .catch(console.error);
     });
@@ -198,6 +200,7 @@ export default function DJRoomPage({ params }: { params: Promise<{ roomId: strin
         panelContent={<DJPanelContent />}
         extraBarControls={reactionBtns}
         dailyParticipants={dailyParticipants}
+        role={role}
       />
       <style>{`@keyframes reactionFloat{0%{opacity:1;transform:translateY(0) scale(1)}100%{opacity:0;transform:translateY(-120px) scale(1.5)}}`}</style>
     </>

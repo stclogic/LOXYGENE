@@ -163,6 +163,105 @@ function InRoomLightingSettings() {
   );
 }
 
+// ── Reusable floating panel: drag + 16:9-locked resize ───────────────────
+
+function FloatingPanel({
+  children,
+  defaultW = 640,
+  aspectRatio = 16 / 9,
+  zIndex = 6,
+}: {
+  children: React.ReactNode;
+  defaultW?: number;
+  aspectRatio?: number;
+  zIndex?: number;
+}) {
+  const [size, setSize] = useState({ w: 0, h: 0 }); // 0 = SSR / not yet mounted
+  const [pos,  setPos]  = useState({ x: 0, y: 0 });
+  const dragging      = useRef(false);
+  const dragOrigin    = useRef({ mx: 0, my: 0, px: 0, py: 0 });
+  const resizing      = useRef(false);
+  const resizeOrigin  = useRef({ mx: 0, my: 0, w: 0, h: 0 });
+
+  useEffect(() => {
+    const w = Math.round(Math.min(defaultW, window.innerWidth * 0.75));
+    const h = Math.round(w / aspectRatio);
+    setSize({ w, h });
+    setPos({
+      x: Math.round((window.innerWidth  - w) / 2),
+      y: Math.round((window.innerHeight - h) / 3),
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const startDrag = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    dragging.current = true;
+    dragOrigin.current = { mx: e.clientX, my: e.clientY, px: pos.x, py: pos.y };
+    const onMove = (ev: MouseEvent) => {
+      if (!dragging.current) return;
+      setPos({
+        x: Math.max(0, Math.min(window.innerWidth  - size.w, dragOrigin.current.px + ev.clientX - dragOrigin.current.mx)),
+        y: Math.max(0, Math.min(window.innerHeight - size.h, dragOrigin.current.py + ev.clientY - dragOrigin.current.my)),
+      });
+    };
+    const onUp = () => { dragging.current = false; window.removeEventListener("mousemove", onMove); window.removeEventListener("mouseup", onUp); };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  };
+
+  const startResize = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    resizing.current = true;
+    resizeOrigin.current = { mx: e.clientX, my: e.clientY, w: size.w, h: size.h };
+    const onMove = (ev: MouseEvent) => {
+      if (!resizing.current) return;
+      const rawW = resizeOrigin.current.w + ev.clientX - resizeOrigin.current.mx;
+      const w = Math.max(200, Math.min(window.innerWidth * 0.95, rawW));
+      setSize({ w, h: Math.round(w / aspectRatio) });
+    };
+    const onUp = () => { resizing.current = false; window.removeEventListener("mousemove", onMove); window.removeEventListener("mouseup", onUp); };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  };
+
+  if (size.w === 0) return null;
+
+  return (
+    <div
+      className="absolute overflow-hidden"
+      style={{
+        left: pos.x, top: pos.y, width: size.w, height: size.h, zIndex,
+        borderRadius: 14,
+        boxShadow: "0 16px 64px rgba(0,0,0,0.75), 0 0 0 1.5px rgba(255,255,255,0.14)",
+        userSelect: "none",
+      }}
+    >
+      {children}
+      {/* Drag bar */}
+      <div
+        className="absolute top-0 left-0 right-0 h-8 flex items-center px-2.5 cursor-move select-none"
+        style={{ background: "linear-gradient(to bottom, rgba(0,0,0,0.6) 0%, transparent 100%)" }}
+        onMouseDown={startDrag}
+      >
+        <Icon icon="solar:hamburger-menu-bold" className="w-3 h-3 text-white/40 pointer-events-none" />
+      </div>
+      {/* SE resize grip */}
+      <div
+        className="absolute bottom-0 right-0 w-7 h-7 flex items-end justify-end p-1.5 cursor-se-resize"
+        onMouseDown={startResize}
+      >
+        <svg width="10" height="10" viewBox="0 0 10 10">
+          <line x1="2" y1="10" x2="10" y2="2" stroke="rgba(255,255,255,0.5)" strokeWidth="1.5" strokeLinecap="round"/>
+          <line x1="6" y1="10" x2="10" y2="6" stroke="rgba(255,255,255,0.5)" strokeWidth="1.5" strokeLinecap="round"/>
+        </svg>
+      </div>
+    </div>
+  );
+}
+
 // ──────────────────────────────────────────────────────────────────────────
 
 function VideoTile({ track, name, className }: { track?: MediaStreamTrack | null; name: string; className?: string }) {
@@ -537,38 +636,39 @@ export function PartyRoomShell({
             </div>
           </div>
         )}
-        {/* YouTube karaoke embed — show whenever a video ID is set */}
-        {karaokeVideoId ? (
-          <div className="absolute inset-0 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.9)" }}>
-            <div className="w-full" style={{ maxWidth: "min(90vw, calc(90vh * 16/9))", aspectRatio: "16/9" }}>
-              <iframe
-                key={karaokeVideoId}
-                title="노래방 유튜브"
-                src={`https://www.youtube.com/embed/${karaokeVideoId}?rel=0&modestbranding=1`}
-                allow="autoplay; encrypted-media; fullscreen"
-                allowFullScreen
-                className="w-full h-full rounded-xl border-0"
-              />
-            </div>
-          </div>
-        ) : spotlighted && dailyParticipants?.[spotlighted]?.tracks?.video?.persistentTrack ? (
-          /* Spotlighted participant's live Daily.co video — fills the stage */
-          <VideoTile
-            track={dailyParticipants[spotlighted].tracks.video.persistentTrack}
-            name={spotlightedName}
-            className="absolute inset-0"
-          />
-        ) : (
-          /* Default silhouette when no spotlight / no karaoke */
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none">
-            <span className="text-[18vw] opacity-[0.04]">{spotlightedP ? "👤" : "🎙️"}</span>
-          </div>
+        {/* Stage silhouette — always visible as backdrop */}
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none">
+          <span className="text-[18vw] opacity-[0.04]">{spotlightedP ? "👤" : "🎙️"}</span>
+        </div>
+
+        {/* Vignette */}
+        <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse at center, transparent 25%, rgba(0,0,0,0.8) 100%)" }} />
+
+        {/* ── Karaoke YouTube — floating, draggable, resizable ── */}
+        {karaokeVideoId && (
+          <FloatingPanel key={karaokeVideoId} defaultW={680} aspectRatio={16 / 9} zIndex={6}>
+            <iframe
+              title="노래방 유튜브"
+              src={`https://www.youtube.com/embed/${karaokeVideoId}?rel=0&modestbranding=1`}
+              allow="autoplay; encrypted-media; fullscreen"
+              allowFullScreen
+              className="absolute inset-0 w-full h-full border-0"
+            />
+          </FloatingPanel>
         )}
-        {/* Vignette — skip when video is playing */}
-        {!karaokeVideoId && (
-          <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse at center, transparent 25%, rgba(0,0,0,0.8) 100%)" }} />
+
+        {/* ── Spotlight participant video — floating, draggable, resizable ── */}
+        {spotlighted && dailyParticipants?.[spotlighted]?.tracks?.video?.persistentTrack && (
+          <FloatingPanel key={spotlighted} defaultW={480} aspectRatio={16 / 9} zIndex={7}>
+            <VideoTile
+              track={dailyParticipants[spotlighted].tracks.video.persistentTrack}
+              name={spotlightedName}
+              className="absolute inset-0"
+            />
+          </FloatingPanel>
         )}
-        {/* Karaoke lyrics teleprompter */}
+
+        {/* Karaoke lyrics teleprompter (z above panels) */}
         {karaokeVideoId && karaokeLyrics.length > 0 && (
           <div
             className="absolute bottom-20 left-0 right-0 z-10 flex flex-col items-center gap-1 px-6 py-3 pointer-events-none"

@@ -74,12 +74,13 @@ const MOCK_REPORTS: Report[] = [
 
 // ─── Sidebar Nav ──────────────────────────────────────────────────────────────
 const NAV = [
-  { key: "dashboard", label: "대시보드", icon: "solar:widget-5-bold" },
-  { key: "users", label: "유저관리", icon: "solar:users-group-two-rounded-bold" },
-  { key: "rooms", label: "룸관리", icon: "solar:home-smile-bold" },
-  { key: "settlements", label: "정산관리", icon: "solar:wallet-money-bold" },
-  { key: "reports", label: "신고관리", icon: "solar:shield-warning-bold" },
-  { key: "settings", label: "시스템설정", icon: "solar:settings-bold" },
+  { key: "dashboard",   label: "대시보드",   icon: "solar:widget-5-bold" },
+  { key: "users",       label: "유저관리",   icon: "solar:users-group-two-rounded-bold" },
+  { key: "rooms",       label: "룸관리",     icon: "solar:home-smile-bold" },
+  { key: "settlements", label: "정산관리",   icon: "solar:wallet-money-bold" },
+  { key: "reports",     label: "신고관리",   icon: "solar:shield-warning-bold" },
+  { key: "logs",        label: "액션 로그",  icon: "solar:clipboard-list-bold" },
+  { key: "settings",    label: "시스템설정", icon: "solar:settings-bold" },
 ];
 
 // ─── Small helpers ─────────────────────────────────────────────────────────────
@@ -802,6 +803,96 @@ function SystemSettingsTab() {
   );
 }
 
+// ─── Tab: 액션 로그 ─────────────────────────────────────────────────────────────
+interface ActionLog {
+  id: string;
+  admin_id: string;
+  action_type: string;
+  target_type: string | null;
+  target_id: string | null;
+  description: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+}
+
+function ActionLogsTab() {
+  const [logs, setLogs] = useState<ActionLog[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    fetch("/api/admin/logs")
+      .then(r => r.ok ? r.json() : Promise.reject(r.statusText))
+      .then(d => setLogs(d.logs ?? []))
+      .catch(e => setError(String(e)))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const actionColor: Record<string, string> = {
+    force_close: DANGER,
+    kick:        WARN,
+    settle:      SUCCESS,
+    suspend:     WARN,
+    ban:         DANGER,
+  };
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex items-center justify-between">
+        <p className="text-sm font-bold text-white">최근 관리자 액션 (최대 100건)</p>
+        <button
+          onClick={() => { setLoading(true); setError(""); fetch("/api/admin/logs").then(r => r.json()).then(d => setLogs(d.logs ?? [])).catch(e => setError(String(e))).finally(() => setLoading(false)); }}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all hover:opacity-80"
+          style={{ background: `${ACCENT}10`, border: `1px solid ${ACCENT}30`, color: ACCENT }}
+        >
+          <Icon icon="solar:refresh-bold" className="w-3.5 h-3.5" />
+          새로고침
+        </button>
+      </div>
+
+      <div className="rounded-2xl overflow-hidden" style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)" }}>
+        {loading ? (
+          <div className="text-center py-12 text-white/25 text-sm">로딩 중...</div>
+        ) : error ? (
+          <div className="text-center py-12 text-sm" style={{ color: DANGER }}>오류: {error}</div>
+        ) : logs.length === 0 ? (
+          <div className="text-center py-12 text-white/20 text-sm">액션 로그가 없습니다</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+                  {["시간", "관리자 ID", "액션", "대상 유형", "대상 ID", "설명"].map(h => (
+                    <th key={h} className="text-left px-4 py-3 text-white/30 font-medium whitespace-nowrap">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {logs.map(log => {
+                  const color = actionColor[log.action_type] ?? ACCENT;
+                  const ts = new Date(log.created_at).toLocaleString("ko-KR", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit" });
+                  return (
+                    <tr key={log.id} className="border-t hover:bg-white/[0.02] transition-colors" style={{ borderColor: "rgba(255,255,255,0.04)" }}>
+                      <td className="px-4 py-3 text-white/35 whitespace-nowrap font-mono">{ts}</td>
+                      <td className="px-4 py-3 text-white/50 max-w-[120px] truncate font-mono">{log.admin_id.slice(0, 12)}…</td>
+                      <td className="px-4 py-3">
+                        <Badge text={log.action_type} color={color} />
+                      </td>
+                      <td className="px-4 py-3 text-white/40">{log.target_type ?? "—"}</td>
+                      <td className="px-4 py-3 text-white/40 max-w-[120px] truncate font-mono">{log.target_id ?? "—"}</td>
+                      <td className="px-4 py-3 text-white/55 max-w-[220px] truncate">{log.description ?? "—"}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 export default function AdminPage() {
   const router = useRouter();
@@ -909,6 +1000,7 @@ export default function AdminPage() {
           {activeTab === "rooms" && <RoomsTab terminatedRooms={terminatedRooms} onForceEnd={handleForceEnd} />}
           {activeTab === "settlements" && <SettlementsTab />}
           {activeTab === "reports" && <ReportsTab />}
+          {activeTab === "logs" && <ActionLogsTab />}
           {activeTab === "settings" && <SystemSettingsTab />}
         </main>
       </div>

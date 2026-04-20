@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { getSupabaseServer } from "@/lib/supabase/supabaseServer";
+import { logAdminAction } from "@/lib/adminLog";
 import { z } from "zod";
 
 const schema = z.object({ roomId: z.string().min(1) });
@@ -25,11 +26,12 @@ export async function POST(req: NextRequest) {
 
   await supabase.from("rooms").update({ is_active: false }).eq("id", roomId);
 
-  await supabase.from("admin_action_logs").insert({
-    admin_id: session.user.id,
-    action: "force_close",
-    target_room_id: roomId,
-    metadata: {},
+  await logAdminAction({
+    adminId:     session.user.id,
+    actionType:  "force_close",
+    targetType:  "room",
+    targetId:    roomId,
+    description: `Force-closed room ${roomId}`,
   });
 
   return NextResponse.json({ success: true });

@@ -1,3 +1,5 @@
+export type RoomType = 'colosseum' | 'variety' | 'talkshow' | 'dj' | 'black';
+
 export type RoomTag = string;
 
 export interface RoomUser {

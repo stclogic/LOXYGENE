@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { getSupabaseServer } from "@/lib/supabase/supabaseServer";
+import { logAdminAction } from "@/lib/adminLog";
 import { z } from "zod";
 
 const schema = z.object({
@@ -33,11 +34,13 @@ export async function POST(req: NextRequest) {
     .eq("room_id", roomId)
     .eq("user_id", userId);
 
-  await supabase.from("admin_action_logs").insert({
-    admin_id: session.user.id,
-    action: "kick",
-    target_room_id: roomId,
-    metadata: { kicked_user_id: userId, kicked_nickname: nickname ?? null },
+  await logAdminAction({
+    adminId:     session.user.id,
+    actionType:  "kick",
+    targetType:  "user",
+    targetId:    userId,
+    description: `Kicked user${nickname ? ` (${nickname})` : ""} from room ${roomId}`,
+    metadata:    { roomId, nickname: nickname ?? null },
   });
 
   return NextResponse.json({ success: true });

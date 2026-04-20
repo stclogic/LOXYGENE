@@ -35,8 +35,6 @@ interface Props {
   panelContent?: React.ReactNode;
   extraBarControls?: React.ReactNode;
   dailyParticipants?: Record<string, DailyParticipant>;
-  karaokeVideoId?: string;
-  karaokeLyrics?: string[];
   roomId?: string;
   nickname?: string;
   isSuperAdmin?: boolean;
@@ -300,8 +298,6 @@ export function PartyRoomShell({
   panelContent,
   extraBarControls,
   dailyParticipants,
-  karaokeVideoId,
-  karaokeLyrics = [],
   roomId = "default",
   nickname = "게스트",
   isSuperAdmin = false,
@@ -324,7 +320,6 @@ export function PartyRoomShell({
   const [forceCloseConfirm, setForceCloseConfirm] = useState(false);
   const [bannerDismissed, setBannerDismissed] = useState(false);
   const [allMuted, setAllMuted] = useState(false);
-  const [karaokeOn, setKaraokeOn] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState<"audio" | "video" | "eq" | "lighting">("audio");
   const settingsHistoryPushed = useRef(false);
@@ -411,6 +406,14 @@ export function PartyRoomShell({
       return next;
     });
   };
+
+  // Auto-request camera when user is host
+  useEffect(() => {
+    if (!isHost) return;
+    navigator.mediaDevices.getUserMedia({ video: true, audio: false })
+      .then(stream => setHostStream(stream))
+      .catch(() => {}); // user denied — panel shows placeholder
+  }, [isHost]);
 
   // Wire host camera stream to video element
   useEffect(() => {
@@ -601,8 +604,8 @@ export function PartyRoomShell({
           style={{ background: `linear-gradient(135deg, ${selectedBg.from}, ${selectedBg.via}, ${selectedBg.to})` }}
         />
 
-        {/* Camera panel — floating & resizable over the gradient */}
-        {bgMode === "camera" && hostStream && videoPanelSize.w > 0 && (
+        {/* Host video panel — always visible when isHost, floating & resizable */}
+        {isHost && videoPanelSize.w > 0 && (
           <div
             className="absolute overflow-hidden"
             style={{
@@ -616,22 +619,31 @@ export function PartyRoomShell({
               zIndex: 5,
             }}
           >
-            <video
-              ref={hostVideoRef}
-              autoPlay
-              muted
-              playsInline
-              className="absolute inset-0 w-full h-full object-cover"
-            />
-            {/* Drag bar — top gradient overlay */}
+            {hostStream ? (
+              <video
+                ref={hostVideoRef}
+                autoPlay
+                muted
+                playsInline
+                className="absolute inset-0 w-full h-full object-cover"
+              />
+            ) : (
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2"
+                style={{ background: "rgba(8,8,20,0.85)", backdropFilter: "blur(8px)" }}>
+                <span className="text-3xl">📷</span>
+                <span className="text-white/40 text-xs">카메라 연결 중...</span>
+              </div>
+            )}
+            {/* Drag bar */}
             <div
               className="absolute top-0 left-0 right-0 h-8 flex items-center px-2.5 cursor-move select-none"
               style={{ background: "linear-gradient(to bottom, rgba(0,0,0,0.55) 0%, transparent 100%)" }}
               onMouseDown={startVideoDrag}
             >
               <Icon icon="solar:hamburger-menu-bold" className="w-3 h-3 text-white/40" />
+              <span className="text-[9px] text-white/30 ml-1.5">호스트 영상</span>
             </div>
-            {/* Resize handle — SE corner */}
+            {/* Resize handle SE */}
             <div
               className="absolute bottom-0 right-0 w-7 h-7 flex items-end justify-end p-1.5 cursor-se-resize"
               onMouseDown={startVideoResize}
@@ -651,19 +663,6 @@ export function PartyRoomShell({
         {/* Vignette */}
         <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse at center, transparent 25%, rgba(0,0,0,0.8) 100%)" }} />
 
-        {/* ── Karaoke YouTube — floating, draggable, resizable ── */}
-        {karaokeVideoId && (
-          <FloatingPanel key={karaokeVideoId} defaultW={680} aspectRatio={16 / 9} zIndex={6}>
-            <iframe
-              title="노래방 유튜브"
-              src={`https://www.youtube.com/embed/${karaokeVideoId}?rel=0&modestbranding=1`}
-              allow="autoplay; encrypted-media; fullscreen"
-              allowFullScreen
-              className="absolute inset-0 w-full h-full border-0"
-            />
-          </FloatingPanel>
-        )}
-
         {/* ── Spotlight participant video — floating, draggable, resizable ── */}
         {spotlighted && dailyParticipants?.[spotlighted]?.tracks?.video?.persistentTrack && (
           <FloatingPanel key={spotlighted} defaultW={480} aspectRatio={16 / 9} zIndex={7}>
@@ -673,29 +672,6 @@ export function PartyRoomShell({
               className="absolute inset-0"
             />
           </FloatingPanel>
-        )}
-
-        {/* Karaoke lyrics teleprompter (z above panels) */}
-        {karaokeVideoId && karaokeLyrics.length > 0 && (
-          <div
-            className="absolute bottom-20 left-0 right-0 z-10 flex flex-col items-center gap-1 px-6 py-3 pointer-events-none"
-            style={{ background: "linear-gradient(to top, rgba(0,0,0,0.75) 0%, transparent 100%)" }}
-          >
-            {karaokeLyrics.slice(0, 4).map((line, i) => (
-              <p
-                key={i}
-                className="text-center font-semibold drop-shadow-lg"
-                style={{
-                  fontSize: i === 0 ? "1.1rem" : "0.8rem",
-                  color: i === 0 ? "#00E5FF" : "rgba(255,255,255,0.45)",
-                  textShadow: i === 0 ? "0 0 20px rgba(0,229,255,0.6)" : "none",
-                  letterSpacing: "0.05em",
-                }}
-              >
-                {line}
-              </p>
-            ))}
-          </div>
         )}
 
         {/* Spotlight name tag */}
@@ -726,7 +702,7 @@ export function PartyRoomShell({
           {roomSubtitle && <p className="text-white/30 text-[10px] mt-0.5">{roomSubtitle}</p>}
         </div>
         <div className="flex items-center gap-2">
-          <YouTubeBackgroundPlayer videoId="vh9pvpFK8bE" />
+          <YouTubeBackgroundPlayer videoId="9MYpxt-0xwY" />
           <div className="flex items-center gap-1 px-2 py-1 rounded-full" style={{ background: "rgba(239,68,68,0.15)", border: "1px solid rgba(239,68,68,0.3)" }}>
             <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse block" />
             <span className="text-[10px] text-red-400 font-semibold">LIVE</span>
@@ -770,17 +746,6 @@ export function PartyRoomShell({
             <Icon icon="solar:crown-bold" className="w-3 h-3 text-yellow-400" />
             <span className="text-[10px] font-bold text-yellow-400 tracking-wider">호스트 도구</span>
           </div>
-          <button
-            onClick={() => { setKaraokeOn(v => !v); setPanelOpen(v => !v); }}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium transition-all flex-shrink-0"
-            style={{
-              background: karaokeOn ? "rgba(236,72,153,0.2)" : "rgba(255,255,255,0.05)",
-              border: `1px solid ${karaokeOn ? "rgba(236,72,153,0.5)" : "rgba(255,255,255,0.1)"}`,
-              color: karaokeOn ? "#ec4899" : "rgba(255,255,255,0.5)",
-            }}
-          >
-            🎤 노래방 {karaokeOn ? "ON" : "OFF"}
-          </button>
           <button
             onClick={() => setBgPickerOpen(true)}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium transition-all flex-shrink-0"

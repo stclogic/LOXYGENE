@@ -123,10 +123,9 @@ export default function ColosseumRoom001Page() {
   const [ticketChecked, setTicketChecked] = useState(TICKET_COST === 0);
   const [showTicketModal, setShowTicketModal] = useState(TICKET_COST > 0);
 
-  // Video
-  const [started, setStarted] = useState(false);
-  const [showSongInfo, setShowSongInfo] = useState(false);
-  const songInfoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Host camera
+  const [hostStream, setHostStream] = useState<MediaStream | null>(null);
+  const hostVideoRef = useRef<HTMLVideoElement>(null);
 
   // Panel tabs
   const [activeTab, setActiveTab] = useState<"chat" | "queue">("chat");
@@ -239,9 +238,27 @@ export default function ColosseumRoom001Page() {
     return () => document.removeEventListener("mousedown", h);
   }, []);
 
+  // ── Host camera ───────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!isHost) return;
+    navigator.mediaDevices.getUserMedia({ video: true, audio: false })
+      .then(stream => setHostStream(stream))
+      .catch(() => {});
+  }, [isHost]);
+
+  useEffect(() => {
+    if (hostVideoRef.current && hostStream) {
+      hostVideoRef.current.srcObject = hostStream;
+    }
+  }, [hostStream]);
+
+  useEffect(() => {
+    return () => { hostStream?.getTracks().forEach(t => t.stop()); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // ── Cleanup ────────────────────────────────────────────────────────────────
   useEffect(() => () => {
-    if (songInfoTimerRef.current) clearTimeout(songInfoTimerRef.current);
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
   }, []);
 
@@ -255,7 +272,6 @@ export default function ColosseumRoom001Page() {
     toastTimerRef.current = setTimeout(() => setToast(null), 2200);
   };
 
-  // ── Song search (debounced, hits /api/youtube-search) ─────────────────────
   const searchSongs = (query: string) => {
     if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
     if (query.length < 2) { setSearchResults([]); setShowResults(false); return; }
@@ -275,13 +291,6 @@ export default function ColosseumRoom001Page() {
   };
 
   // ── Handlers ──────────────────────────────────────────────────────────────
-  const handlePlay = () => {
-    if (!ticketChecked) { setShowTicketModal(true); return; }
-    setStarted(true);
-    setShowSongInfo(true);
-    songInfoTimerRef.current = setTimeout(() => setShowSongInfo(false), 3000);
-  };
-
   const handleSendMessage = () => {
     if (!chatInput.trim()) return;
     setMessages(prev => [...prev, { id: `msg-${Date.now()}`, type: "user", nickname: MY_NICKNAME, text: chatInput.trim(), timestamp: getTs() }]);
@@ -536,42 +545,16 @@ export default function ColosseumRoom001Page() {
               />
             )}
 
-            {/* YouTube iframe */}
-            {started && !isDuetMode && (
-              <iframe key="yt-iframe" className="absolute inset-0 w-full h-full"
-                src={`https://www.youtube.com/embed/${YOUTUBE_ID}?autoplay=1&controls=1&modestbranding=1&rel=0&enablejsapi=1`}
-                title={`${SONG_TITLE} - ${ARTIST_NAME}`}
-                allow="autoplay; encrypted-media" allowFullScreen />
-            )}
+            {/* Stage background */}
+            <div className="absolute inset-0 bg-[#070707]" style={{ background: "radial-gradient(ellipse at center, rgba(0,229,255,0.04) 0%, #070707 70%)" }} />
 
-            {/* Thumbnail + play button */}
-            {!started && !isDuetMode && (
-              <>
-                <div className="absolute inset-0 bg-[#070707]"
-                  style={{ backgroundImage: `url(https://img.youtube.com/vi/${YOUTUBE_ID}/maxresdefault.jpg)`, backgroundSize: "cover", backgroundPosition: "center" }}>
-                  <div className="absolute inset-0" style={{ background: "rgba(7,7,7,0.55)" }} />
-                </div>
-                <button onClick={handlePlay}
-                  className="absolute inset-0 flex flex-col items-center justify-center gap-4 z-10 group">
-                  <div className="w-20 h-20 rounded-full flex items-center justify-center transition-all group-hover:scale-110 group-active:scale-95"
-                    style={{ background: "rgba(255,0,127,0.1)", border: "2px solid rgba(255,0,127,0.5)", backdropFilter: "blur(12px)", boxShadow: "0 0 30px rgba(255,0,127,0.3)" }}>
-                    <Icon icon="solar:play-circle-linear" className="w-10 h-10 text-[#FF007F]" style={{ filter: "drop-shadow(0 0 8px rgba(255,0,127,0.8))" }} />
-                  </div>
-                  <div className="px-4 py-2 rounded-full text-center"
-                    style={{ background: "rgba(7,7,7,0.7)", border: "1px solid rgba(255,255,255,0.1)", backdropFilter: "blur(8px)" }}>
-                    <p className="text-white/90 text-sm font-semibold">▶ {SONG_TITLE} - {ARTIST_NAME}</p>
-                    <p className="text-white/40 text-[11px] mt-0.5">(가라오케)</p>
-                  </div>
-                  {/* Duet test button (host only) */}
-                  {isHost && (
-                    <button onClick={e => { e.stopPropagation(); setIsDuetMode(true); }}
-                      className="px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all hover:scale-105"
-                      style={{ background: "rgba(168,85,247,0.1)", border: "1px solid rgba(168,85,247,0.3)", color: "#A855F7" }}>
-                      🎤 듀엣 모드 테스트
-                    </button>
-                  )}
-                </button>
-              </>
+            {/* Duet test button (host only, shown in stage) */}
+            {isHost && !isDuetMode && (
+              <button onClick={() => setIsDuetMode(true)}
+                className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all hover:scale-105"
+                style={{ background: "rgba(168,85,247,0.1)", border: "1px solid rgba(168,85,247,0.3)", color: "#A855F7" }}>
+                🎤 듀엣 모드 테스트
+              </button>
             )}
 
             {/* Voice score overlay */}
@@ -875,7 +858,7 @@ export default function ColosseumRoom001Page() {
             </div>
             <div className="flex gap-3 w-full">
               <button onClick={() => setShowTicketModal(false)} className="flex-1 py-2.5 rounded-lg text-sm text-white/50 transition-all hover:text-white/70" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>취소</button>
-              <button onClick={() => { setTicketChecked(true); setShowTicketModal(false); handlePlay(); }}
+              <button onClick={() => { setTicketChecked(true); setShowTicketModal(false); }}
                 className="flex-1 py-2.5 rounded-lg text-sm font-bold transition-all hover:scale-105"
                 style={{ background: "rgba(201,168,76,0.12)", border: "1px solid rgba(201,168,76,0.4)", color: "#C9A84C" }}>
                 {TICKET_COST.toLocaleString()} O₂ 입장
@@ -974,6 +957,27 @@ export default function ColosseumRoom001Page() {
             </button>
           </div>
         </div>
+      )}
+
+      {/* ── 호스트 비디오 플로팅 패널 ── */}
+      {isHost && (
+        <FloatingPanel defaultW={520} aspectRatio={16 / 9} zIndex={55}>
+          {hostStream ? (
+            <video
+              ref={hostVideoRef}
+              autoPlay
+              muted
+              playsInline
+              className="absolute inset-0 w-full h-full object-cover"
+            />
+          ) : (
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-2"
+              style={{ background: "rgba(8,8,20,0.9)", backdropFilter: "blur(8px)" }}>
+              <span className="text-3xl">📷</span>
+              <span className="text-white/40 text-xs">카메라 연결 중...</span>
+            </div>
+          )}
+        </FloatingPanel>
       )}
 
       {/* ── 가라오케 플로팅 패널 ── */}

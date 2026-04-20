@@ -7,19 +7,117 @@ import { hasNickname, setUserNickname, randomNickname, getUserNickname } from "@
 import { useDailyCall } from "@/hooks/useDailyCall";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
 
-const MOCK_LYRICS = [
-  { text: "사랑했지만 이제는 모두 지나간 일", active: false },
-  { text: "그대 없인 살 수 없다 했던 말들이", active: true },
-  { text: "이제는 모두 거짓말이 되어버렸네", active: false },
-  { text: "행복했던 우리의 날들이여", active: false },
-];
-
 const MOCK_QUEUE = [
   { id: "q1", nickname: "가을바람", songTitle: "사랑했지만 (김광석)", position: 1 },
   { id: "q2", nickname: "봄날의꿈", songTitle: "첫눈처럼 너에게 가겠다", position: 2 },
   { id: "q3", nickname: "여름밤", songTitle: "너에게 난, 나에게 넌", position: 3 },
   { id: "q4", nickname: "하늘별", songTitle: "그녀가 처음 울던 날", position: 4 },
 ];
+
+function extractYouTubeId(url: string): string | null {
+  const m = url.match(/(?:youtube\.com\/(?:watch\?(?:.*&)?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+  return m?.[1] ?? (url.match(/^[a-zA-Z0-9_-]{11}$/) ? url : null);
+}
+
+function KaraokePanelContent({
+  onVideoChange,
+  onLyricsChange,
+}: {
+  onVideoChange: (id: string | null) => void;
+  onLyricsChange: (lines: string[]) => void;
+}) {
+  const [urlInput, setUrlInput] = useState("");
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [error, setError] = useState(false);
+  const [lyricsText, setLyricsText] = useState("");
+  const [lyricsMode, setLyricsMode] = useState<"view" | "edit">("view");
+
+  const handleLoad = () => {
+    const id = extractYouTubeId(urlInput.trim());
+    if (id) { setActiveId(id); onVideoChange(id); setError(false); }
+    else setError(true);
+  };
+  const handleClear = () => {
+    setActiveId(null); setUrlInput(""); setError(false); onVideoChange(null);
+  };
+  const handleLyricsChange = (text: string) => {
+    setLyricsText(text);
+    onLyricsChange(text.split("\n").filter(l => l.trim()));
+  };
+  const lyricsLines = lyricsText.split("\n").filter(l => l.trim());
+
+  return (
+    <div className="flex flex-col gap-4 p-4">
+      <div>
+        <p className="text-[10px] text-white/30 tracking-widest font-medium mb-2">유튜브 영상</p>
+        <div className="flex gap-2">
+          <input
+            value={urlInput}
+            onChange={e => { setUrlInput(e.target.value); setError(false); }}
+            onKeyDown={e => { if (e.key === "Enter") handleLoad(); }}
+            placeholder="YouTube URL 또는 영상 ID"
+            className="flex-1 min-w-0 px-3 py-2 rounded-lg text-xs text-white outline-none placeholder-white/20"
+            style={{ background: "rgba(255,255,255,0.05)", border: `1px solid ${error ? "rgba(239,68,68,0.5)" : "rgba(255,255,255,0.1)"}` }}
+          />
+          {activeId ? (
+            <button type="button" onClick={handleClear} className="flex-shrink-0 px-3 py-2 rounded-lg text-xs font-medium"
+              style={{ background: "rgba(239,68,68,0.15)", border: "1px solid rgba(239,68,68,0.3)", color: "#ef4444" }}>중지</button>
+          ) : (
+            <button type="button" onClick={handleLoad} className="flex-shrink-0 px-3 py-2 rounded-lg text-xs font-medium"
+              style={{ background: "rgba(0,229,255,0.12)", border: "1px solid rgba(0,229,255,0.3)", color: "#00E5FF" }}>재생</button>
+          )}
+        </div>
+        {error && <p className="text-[10px] text-red-400 mt-1">올바른 YouTube URL을 입력해주세요.</p>}
+        {activeId && (
+          <div className="flex items-center gap-2 mt-2 px-2 py-1.5 rounded-lg" style={{ background: "rgba(0,229,255,0.06)", border: "1px solid rgba(0,229,255,0.15)" }}>
+            <span className="w-1.5 h-1.5 rounded-full bg-[#00E5FF] animate-pulse block flex-shrink-0" />
+            <span className="text-[10px] text-[#00E5FF] truncate">재생 중 · 무대 화면을 확인하세요</span>
+          </div>
+        )}
+      </div>
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-[10px] text-white/30 tracking-widest font-medium">가사</p>
+          <button type="button" onClick={() => setLyricsMode(m => m === "edit" ? "view" : "edit")}
+            className="text-[10px] px-2 py-0.5 rounded transition-all"
+            style={{ background: lyricsMode === "edit" ? "rgba(0,229,255,0.12)" : "rgba(255,255,255,0.05)", border: `1px solid ${lyricsMode === "edit" ? "rgba(0,229,255,0.3)" : "rgba(255,255,255,0.1)"}`, color: lyricsMode === "edit" ? "#00E5FF" : "rgba(255,255,255,0.4)" }}>
+            {lyricsMode === "edit" ? "완료" : "가사 입력"}
+          </button>
+        </div>
+        {lyricsMode === "edit" ? (
+          <textarea value={lyricsText} onChange={e => handleLyricsChange(e.target.value)}
+            placeholder={"가사를 붙여넣거나 직접 입력하세요.\n한 줄씩 입력하면 화면에 표시됩니다."}
+            rows={8} className="w-full px-3 py-2 rounded-lg text-xs text-white outline-none placeholder-white/20 resize-none"
+            style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(0,229,255,0.2)", lineHeight: 1.7 }} />
+        ) : lyricsLines.length > 0 ? (
+          <div className="flex flex-col gap-1 max-h-48 overflow-y-auto" style={{ scrollbarWidth: "none" }}>
+            {lyricsLines.map((line, i) => (
+              <p key={i} className="text-sm leading-relaxed px-1" style={{ color: "rgba(255,255,255,0.75)" }}>{line}</p>
+            ))}
+          </div>
+        ) : (
+          <p className="text-xs text-white/20 px-1">가사 입력 버튼을 눌러 가사를 추가하면 무대 하단에 표시됩니다.</p>
+        )}
+      </div>
+      <div>
+        <p className="text-[10px] text-white/30 tracking-widest font-medium mb-2">대기열</p>
+        <div className="flex flex-col gap-1.5">
+          {MOCK_QUEUE.map(entry => (
+            <div key={entry.id} className="flex items-center gap-2.5 p-2.5 rounded-lg"
+              style={{ background: entry.position === 1 ? "rgba(0,229,255,0.06)" : "rgba(255,255,255,0.02)", border: entry.position === 1 ? "1px solid rgba(0,229,255,0.15)" : "1px solid rgba(255,255,255,0.04)" }}>
+              <span className="text-xs font-black w-4 text-center flex-shrink-0" style={{ color: entry.position === 1 ? "#00E5FF" : "rgba(255,255,255,0.25)" }}>{entry.position}</span>
+              <div className="min-w-0 flex-1">
+                <p className="text-white/80 text-xs font-semibold truncate">{entry.nickname}</p>
+                <p className="text-white/35 text-[10px] truncate">{entry.songTitle}</p>
+              </div>
+              {entry.position === 1 && <Icon icon="solar:microphone-bold" className="text-[#00E5FF] w-3.5 h-3.5 flex-shrink-0 animate-pulse" />}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function ColosseumRoomPage({ params }: { params: { roomId: string } }) {
   const [nicknameModalOpen, setNicknameModalOpen] = useState(false);
@@ -28,6 +126,8 @@ export default function ColosseumRoomPage({ params }: { params: { roomId: string
   const [dailyToken, setDailyToken] = useState("");
   const [dailyRoomUrl, setDailyRoomUrl] = useState("");
   const [role, setRole] = useState<string>("participant");
+  const [karaokeVideoId, setKaraokeVideoId] = useState<string | null>(null);
+  const [karaokeLyrics, setKaraokeLyrics] = useState<string[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const isSuperAdmin = useIsAdmin();
@@ -77,6 +177,15 @@ export default function ColosseumRoomPage({ params }: { params: { roomId: string
         backHref="/rooms/colosseum"
         accentColor="#00E5FF"
         participantCount={Object.keys(dailyParticipants).length || 127}
+        panelTitle="🎤 노래방"
+        panelContent={
+          <KaraokePanelContent
+            onVideoChange={id => setKaraokeVideoId(id)}
+            onLyricsChange={lines => setKaraokeLyrics(lines)}
+          />
+        }
+        karaokeVideoId={karaokeVideoId ?? undefined}
+        karaokeLyrics={karaokeLyrics}
         dailyParticipants={dailyParticipants}
         roomId={params.roomId}
         nickname={currentNickname}

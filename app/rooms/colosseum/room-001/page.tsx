@@ -22,6 +22,7 @@ const ReactiveBackground = dynamic(
 );
 
 // Other room components
+import { FloatingPanel } from "@/components/room/PartyRoomShell";
 import MainStage from "@/components/room/MainStage";
 import ParticipantRow, { type RoomParticipant } from "@/components/room/ParticipantRow";
 import VoiceScoreDisplay from "@/components/room/VoiceScoreDisplay";
@@ -38,6 +39,11 @@ import { envConfig } from "@/lib/utils/envCheck";
 const SONG_TITLE = "안동역에서";
 const ARTIST_NAME = "진성";
 const YOUTUBE_ID = "L26jSx5TZns";
+
+function extractYouTubeId(url: string): string | null {
+  const m = url.match(/(?:youtube\.com\/(?:watch\?(?:.*&)?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+  return m?.[1] ?? (url.match(/^[a-zA-Z0-9_-]{11}$/) ? url : null);
+}
 const MY_ID = "p3";
 const MY_NICKNAME = "여름밤";
 const TICKET_COST = 0; // 0 = free room
@@ -170,6 +176,13 @@ export default function ColosseumRoom001Page() {
   const [lastGift, setLastGift] = useState<string | null>(null);
   const [lastGiftType, setLastGiftType] = useState<"bouquet" | "champagne" | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Karaoke floating panel
+  const [karaokeVideoId, setKaraokeVideoId] = useState<string | null>(null);
+  const [karaokeLyrics, setKaraokeLyrics] = useState<string[]>([]);
+  const [karaokeUrlInput, setKaraokeUrlInput] = useState("");
+  const [karaokeInputOpen, setKaraokeInputOpen] = useState(false);
+  const [karaokeUrlError, setKaraokeUrlError] = useState(false);
 
   // Director
   const [directorOpen, setDirectorOpen] = useState(false);
@@ -400,6 +413,77 @@ export default function ColosseumRoom001Page() {
         디렉터 호출
       </button>
       <QuickCallModal open={directorOpen} onClose={() => setDirectorOpen(false)} roomId="room-001" />
+
+      {/* 노래방 버튼 (호스트 전용) */}
+      {isHost && (
+        <button
+          type="button"
+          onClick={() => setKaraokeInputOpen(v => !v)}
+          className="fixed top-14 left-36 z-50 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all hover:scale-105 active:scale-95"
+          style={{
+            background: karaokeVideoId ? "rgba(236,72,153,0.15)" : "rgba(255,255,255,0.07)",
+            border: `1px solid ${karaokeVideoId ? "rgba(236,72,153,0.5)" : "rgba(255,255,255,0.15)"}`,
+            color: karaokeVideoId ? "#ec4899" : "rgba(255,255,255,0.6)",
+            backdropFilter: "blur(12px)",
+          }}
+        >
+          <Icon icon="solar:music-note-2-bold" className="w-3.5 h-3.5" />
+          🎤 노래방 {karaokeVideoId ? "ON" : "OFF"}
+        </button>
+      )}
+
+      {/* 노래방 URL 입력 팝오버 */}
+      {isHost && karaokeInputOpen && (
+        <div className="fixed top-24 left-36 z-50 w-72 rounded-xl p-4 flex flex-col gap-3"
+          style={{ background: "rgba(8,8,20,0.97)", border: "1px solid rgba(236,72,153,0.3)", backdropFilter: "blur(20px)", boxShadow: "0 8px 32px rgba(0,0,0,0.6)" }}>
+          <p className="text-[11px] text-white/50 font-medium tracking-widest">YouTube URL 입력</p>
+          <div className="flex gap-2">
+            <input
+              value={karaokeUrlInput}
+              onChange={e => { setKaraokeUrlInput(e.target.value); setKaraokeUrlError(false); }}
+              onKeyDown={e => {
+                if (e.key === "Enter") {
+                  const id = extractYouTubeId(karaokeUrlInput.trim());
+                  if (id) { setKaraokeVideoId(id); setKaraokeInputOpen(false); setKaraokeUrlError(false); }
+                  else setKaraokeUrlError(true);
+                }
+              }}
+              placeholder="youtube.com/watch?v=... 또는 ID"
+              className="flex-1 min-w-0 px-3 py-2 rounded-lg text-xs text-white outline-none placeholder-white/20"
+              style={{ background: "rgba(255,255,255,0.06)", border: `1px solid ${karaokeUrlError ? "rgba(239,68,68,0.5)" : "rgba(255,255,255,0.1)"}` }}
+            />
+            <button
+              type="button"
+              onClick={() => {
+                const id = extractYouTubeId(karaokeUrlInput.trim());
+                if (id) { setKaraokeVideoId(id); setKaraokeInputOpen(false); setKaraokeUrlError(false); }
+                else setKaraokeUrlError(true);
+              }}
+              className="flex-shrink-0 px-3 py-2 rounded-lg text-xs font-bold"
+              style={{ background: "rgba(236,72,153,0.15)", border: "1px solid rgba(236,72,153,0.4)", color: "#ec4899" }}
+            >재생</button>
+          </div>
+          {karaokeUrlError && <p className="text-[10px] text-red-400">올바른 YouTube URL을 입력해주세요.</p>}
+          {karaokeVideoId && (
+            <button
+              type="button"
+              onClick={() => { setKaraokeVideoId(null); setKaraokeUrlInput(""); setKaraokeInputOpen(false); }}
+              className="text-[11px] py-1.5 rounded-lg"
+              style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.25)", color: "rgba(239,68,68,0.8)" }}
+            >🔴 영상 중지</button>
+          )}
+          <div className="border-t pt-3" style={{ borderColor: "rgba(255,255,255,0.06)" }}>
+            <p className="text-[10px] text-white/30 mb-2">가사 입력 (선택)</p>
+            <textarea
+              placeholder={"가사를 한 줄씩 입력하면\n화면 하단에 표시됩니다"}
+              rows={4}
+              className="w-full px-3 py-2 rounded-lg text-xs text-white outline-none placeholder-white/20 resize-none"
+              style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)", lineHeight: 1.7 }}
+              onChange={e => setKaraokeLyrics(e.target.value.split("\n").filter(l => l.trim()))}
+            />
+          </div>
+        </div>
+      )}
 
       {/* Ticket banner (paid rooms) */}
       {TICKET_COST > 0 && !ticketChecked && (
@@ -889,6 +973,37 @@ export default function ColosseumRoom001Page() {
               입장하기
             </button>
           </div>
+        </div>
+      )}
+
+      {/* ── 가라오케 플로팅 패널 ── */}
+      {karaokeVideoId && (
+        <FloatingPanel key={karaokeVideoId} defaultW={680} aspectRatio={16 / 9} zIndex={60}>
+          <iframe
+            title="노래방 유튜브"
+            src={`https://www.youtube.com/embed/${karaokeVideoId}?rel=0&modestbranding=1&autoplay=1`}
+            allow="autoplay; encrypted-media; fullscreen"
+            allowFullScreen
+            className="absolute inset-0 w-full h-full border-0"
+          />
+        </FloatingPanel>
+      )}
+
+      {/* ── 가사 자막 ── */}
+      {karaokeVideoId && karaokeLyrics.length > 0 && (
+        <div className="fixed bottom-28 left-0 right-0 z-50 flex flex-col items-center gap-1 px-6 py-3 pointer-events-none"
+          style={{ background: "linear-gradient(to top, rgba(0,0,0,0.75) 0%, transparent 100%)" }}>
+          {karaokeLyrics.slice(0, 4).map((line, i) => (
+            <p key={i} className="text-center font-semibold drop-shadow-lg"
+              style={{
+                fontSize: i === 0 ? "1.1rem" : "0.8rem",
+                color: i === 0 ? "#00E5FF" : "rgba(255,255,255,0.45)",
+                textShadow: i === 0 ? "0 0 20px rgba(0,229,255,0.6)" : "none",
+                letterSpacing: "0.05em",
+              }}>
+              {line}
+            </p>
+          ))}
         </div>
       )}
 

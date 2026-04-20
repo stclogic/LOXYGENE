@@ -35,6 +35,8 @@ interface Props {
   panelContent?: React.ReactNode;
   extraBarControls?: React.ReactNode;
   dailyParticipants?: Record<string, DailyParticipant>;
+  karaokeVideoId?: string;
+  karaokeLyrics?: string[];
   roomId?: string;
   nickname?: string;
   isSuperAdmin?: boolean;
@@ -165,7 +167,7 @@ function InRoomLightingSettings() {
 
 // ── Reusable floating panel: drag + 16:9-locked resize ───────────────────
 
-function FloatingPanel({
+export function FloatingPanel({
   children,
   defaultW = 640,
   aspectRatio = 16 / 9,
@@ -298,6 +300,8 @@ export function PartyRoomShell({
   panelContent,
   extraBarControls,
   dailyParticipants,
+  karaokeVideoId,
+  karaokeLyrics = [],
   roomId = "default",
   nickname = "게스트",
   isSuperAdmin = false,
@@ -320,6 +324,7 @@ export function PartyRoomShell({
   const [forceCloseConfirm, setForceCloseConfirm] = useState(false);
   const [bannerDismissed, setBannerDismissed] = useState(false);
   const [allMuted, setAllMuted] = useState(false);
+  const [karaokeOn, setKaraokeOn] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState<"audio" | "video" | "eq" | "lighting">("audio");
   const settingsHistoryPushed = useRef(false);
@@ -663,6 +668,42 @@ export function PartyRoomShell({
         {/* Vignette */}
         <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse at center, transparent 25%, rgba(0,0,0,0.8) 100%)" }} />
 
+        {/* ── Karaoke YouTube — floating, draggable, resizable ── */}
+        {karaokeVideoId && (
+          <FloatingPanel key={karaokeVideoId} defaultW={680} aspectRatio={16 / 9} zIndex={6}>
+            <iframe
+              title="노래방 유튜브"
+              src={`https://www.youtube.com/embed/${karaokeVideoId}?rel=0&modestbranding=1`}
+              allow="autoplay; encrypted-media; fullscreen"
+              allowFullScreen
+              className="absolute inset-0 w-full h-full border-0"
+            />
+          </FloatingPanel>
+        )}
+
+        {/* ── Karaoke lyrics teleprompter ── */}
+        {karaokeVideoId && karaokeLyrics.length > 0 && (
+          <div
+            className="absolute bottom-20 left-0 right-0 z-10 flex flex-col items-center gap-1 px-6 py-3 pointer-events-none"
+            style={{ background: "linear-gradient(to top, rgba(0,0,0,0.75) 0%, transparent 100%)" }}
+          >
+            {karaokeLyrics.slice(0, 4).map((line, i) => (
+              <p
+                key={i}
+                className="text-center font-semibold drop-shadow-lg"
+                style={{
+                  fontSize: i === 0 ? "1.1rem" : "0.8rem",
+                  color: i === 0 ? "#00E5FF" : "rgba(255,255,255,0.45)",
+                  textShadow: i === 0 ? "0 0 20px rgba(0,229,255,0.6)" : "none",
+                  letterSpacing: "0.05em",
+                }}
+              >
+                {line}
+              </p>
+            ))}
+          </div>
+        )}
+
         {/* ── Spotlight participant video — floating, draggable, resizable ── */}
         {spotlighted && dailyParticipants?.[spotlighted]?.tracks?.video?.persistentTrack && (
           <FloatingPanel key={spotlighted} defaultW={480} aspectRatio={16 / 9} zIndex={7}>
@@ -746,6 +787,17 @@ export function PartyRoomShell({
             <Icon icon="solar:crown-bold" className="w-3 h-3 text-yellow-400" />
             <span className="text-[10px] font-bold text-yellow-400 tracking-wider">호스트 도구</span>
           </div>
+          <button
+            onClick={() => { setKaraokeOn(v => !v); setPanelOpen(v => !v); }}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium transition-all flex-shrink-0"
+            style={{
+              background: karaokeOn ? "rgba(236,72,153,0.2)" : "rgba(255,255,255,0.05)",
+              border: `1px solid ${karaokeOn ? "rgba(236,72,153,0.5)" : "rgba(255,255,255,0.1)"}`,
+              color: karaokeOn ? "#ec4899" : "rgba(255,255,255,0.5)",
+            }}
+          >
+            🎤 노래방 {karaokeOn ? "ON" : "OFF"}
+          </button>
           <button
             onClick={() => setBgPickerOpen(true)}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium transition-all flex-shrink-0"

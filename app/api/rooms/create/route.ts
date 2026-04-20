@@ -5,7 +5,7 @@ import { z } from 'zod'
 
 const schema = z.object({
   title: z.string().min(1).max(50),
-  type: z.enum(['colosseum', 'variety', 'talkshow', 'dj']),
+  type: z.enum(['colosseum', 'variety', 'talkshow', 'dj', 'black']),
   maxParticipants: z.number().min(2).max(50).default(50),
   password: z.string().optional(),
   isPrivate: z.boolean().default(false),

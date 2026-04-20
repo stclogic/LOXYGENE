@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { Icon } from "@iconify/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useIsAdmin } from "@/hooks/useIsAdmin";
 
 const VALID_CODE = "7X9K";
 
@@ -13,7 +14,19 @@ export default function BlackLobbyPage() {
   const [focused, setFocused] = useState(false);
   const [shake, setShake] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [rooms, setRooms] = useState<{ id: string; title: string }[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
+  const isAdmin = useIsAdmin();
+
+  // Admin: load existing Black rooms + allow creation
+  useEffect(() => {
+    if (!isAdmin) return;
+    fetch("/api/rooms/list?type=black")
+      .then(r => r.ok ? r.json() : { rooms: [] })
+      .then(d => setRooms((d.rooms ?? []).map((r: { id: string; title?: string }) => ({ id: r.id, title: r.title ?? "Untitled" }))))
+      .catch(() => {});
+  }, [isAdmin]);
 
   const handleSubmit = () => {
     if (code.toUpperCase() === VALID_CODE || code.length >= 4) {
@@ -23,6 +36,21 @@ export default function BlackLobbyPage() {
       setShake(true);
       setTimeout(() => setShake(false), 500);
       setCode("");
+    }
+  };
+
+  const createBlackRoom = async () => {
+    setCreating(true);
+    try {
+      const res = await fetch("/api/rooms/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: "L'OXYGÈNE BLACK — Penthouse", type: "black", maxParticipants: 20 }),
+      });
+      const data = await res.json();
+      if (data.roomId) router.push(`/rooms/black/${data.roomId}`);
+    } finally {
+      setCreating(false);
     }
   };
 
@@ -88,6 +116,46 @@ export default function BlackLobbyPage() {
             <div className="flex-1 h-px" style={{ background: "linear-gradient(to left, transparent, rgba(201,168,76,0.15))" }} />
           </div>
         </div>
+
+        {/* ── SUPER ADMIN BYPASS PANEL ── */}
+        {isAdmin && (
+          <div className="w-full max-w-sm flex flex-col gap-4 p-6 rounded-2xl mb-6"
+            style={{ background: "rgba(255,215,0,0.04)", border: "1px solid rgba(255,215,0,0.2)", backdropFilter: "blur(24px)" }}>
+            <div className="flex items-center gap-2">
+              <Icon icon="solar:shield-keyhole-bold" className="w-4 h-4 text-yellow-400" />
+              <span className="text-[11px] font-bold tracking-widest text-yellow-400">SUPER ADMIN — FREEPASS</span>
+            </div>
+
+            {/* Existing rooms */}
+            {rooms.length > 0 && (
+              <div className="flex flex-col gap-2">
+                <p className="text-[10px] text-white/25 tracking-widest">기존 방</p>
+                {rooms.map(r => (
+                  <button key={r.id} onClick={() => router.push(`/rooms/black/${r.id}`)}
+                    className="flex items-center justify-between px-3 py-2 rounded-xl text-xs text-left transition-all active:scale-95"
+                    style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,215,0,0.15)", color: "rgba(201,168,76,0.8)" }}>
+                    <span className="truncate">{r.title}</span>
+                    <Icon icon="solar:arrow-right-linear" className="w-3.5 h-3.5 flex-shrink-0 ml-2" />
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Quick enter penthouse-1 (static sample) */}
+            <button onClick={() => router.push("/rooms/black/penthouse-1")}
+              className="w-full py-2.5 rounded-xl text-sm font-light tracking-[0.25em] uppercase transition-all active:scale-95"
+              style={{ background: "rgba(201,168,76,0.1)", border: "1px solid rgba(201,168,76,0.35)", color: "#C9A84C" }}>
+              샘플 룸 입장 (penthouse-1)
+            </button>
+
+            {/* Create new Black room */}
+            <button onClick={createBlackRoom} disabled={creating}
+              className="w-full py-2.5 rounded-xl text-sm font-light tracking-[0.25em] uppercase transition-all active:scale-95 disabled:opacity-40"
+              style={{ background: "rgba(255,215,0,0.08)", border: "1px solid rgba(255,215,0,0.3)", color: "rgba(255,215,0,0.8)" }}>
+              {creating ? "생성 중..." : "＋ 새 Black 방 만들기"}
+            </button>
+          </div>
+        )}
 
         {/* Access code panel */}
         <div

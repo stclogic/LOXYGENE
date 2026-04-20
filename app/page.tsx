@@ -13,6 +13,10 @@ import { getUserNickname, setUserNickname, getUserMembership } from "@/lib/utils
 import dynamic from "next/dynamic";
 
 const ChargeModal = dynamic(() => import("@/components/ui/ChargeModal"), { ssr: false });
+const YouTubeBackgroundPlayer = dynamic(
+  () => import("@/components/room/YouTubeBackgroundPlayer").then(m => m.YouTubeBackgroundPlayer),
+  { ssr: false }
+);
 import { LoxygeneCarousel } from "@/components/ui/LoxygeneCarousel";
 
 // ── Mock data ─────────────────────────────────────────────────
@@ -1060,6 +1064,9 @@ function Home() {
 
           {/* Hero */}
           <section className="relative w-full rounded-2xl overflow-hidden border border-white/5 bg-black/40 backdrop-blur-sm min-h-[220px] sm:min-h-[280px] lg:min-h-[340px] flex flex-col items-center justify-center p-4 sm:p-8 group">
+            <div className="absolute top-3 right-3 z-30">
+              <YouTubeBackgroundPlayer videoId="9MYpxt-0xwY" />
+            </div>
             <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black/90 z-10 pointer-events-none" />
             <div className="absolute inset-0 opacity-30 group-hover:opacity-40 transition-opacity duration-700 mix-blend-screen pointer-events-none"
               style={{ background: "radial-gradient(ellipse at center, rgba(0,229,255,0.2), #070707, #070707)" }} />

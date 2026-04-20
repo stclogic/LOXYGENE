@@ -726,7 +726,7 @@ export function PartyRoomShell({
           {roomSubtitle && <p className="text-white/30 text-[10px] mt-0.5">{roomSubtitle}</p>}
         </div>
         <div className="flex items-center gap-2">
-          <YouTubeBackgroundPlayer videoId="9MYpxt-0xwY" />
+          <YouTubeBackgroundPlayer videoId="vh9pvpFK8bE" />
           <div className="flex items-center gap-1 px-2 py-1 rounded-full" style={{ background: "rgba(239,68,68,0.15)", border: "1px solid rgba(239,68,68,0.3)" }}>
             <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse block" />
             <span className="text-[10px] text-red-400 font-semibold">LIVE</span>

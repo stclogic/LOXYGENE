@@ -609,57 +609,6 @@ export function PartyRoomShell({
           style={{ background: `linear-gradient(135deg, ${selectedBg.from}, ${selectedBg.via}, ${selectedBg.to})` }}
         />
 
-        {/* Host video panel — always visible when isHost, floating & resizable */}
-        {isHost && videoPanelSize.w > 0 && (
-          <div
-            className="absolute overflow-hidden"
-            style={{
-              left: videoPanelPos.x,
-              top:  videoPanelPos.y,
-              width:  videoPanelSize.w,
-              height: videoPanelSize.h,
-              borderRadius: 14,
-              boxShadow: "0 16px 64px rgba(0,0,0,0.7), 0 0 0 1.5px rgba(255,255,255,0.14)",
-              transition: "box-shadow 0.3s ease",
-              zIndex: 5,
-            }}
-          >
-            {hostStream ? (
-              <video
-                ref={hostVideoRef}
-                autoPlay
-                muted
-                playsInline
-                className="absolute inset-0 w-full h-full object-cover"
-              />
-            ) : (
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2"
-                style={{ background: "rgba(8,8,20,0.85)", backdropFilter: "blur(8px)" }}>
-                <span className="text-3xl">📷</span>
-                <span className="text-white/40 text-xs">카메라 연결 중...</span>
-              </div>
-            )}
-            {/* Drag bar */}
-            <div
-              className="absolute top-0 left-0 right-0 h-8 flex items-center px-2.5 cursor-move select-none"
-              style={{ background: "linear-gradient(to bottom, rgba(0,0,0,0.55) 0%, transparent 100%)" }}
-              onMouseDown={startVideoDrag}
-            >
-              <Icon icon="solar:hamburger-menu-bold" className="w-3 h-3 text-white/40" />
-              <span className="text-[9px] text-white/30 ml-1.5">호스트 영상</span>
-            </div>
-            {/* Resize handle SE */}
-            <div
-              className="absolute bottom-0 right-0 w-7 h-7 flex items-end justify-end p-1.5 cursor-se-resize"
-              onMouseDown={startVideoResize}
-            >
-              <svg width="10" height="10" viewBox="0 0 10 10">
-                <line x1="2" y1="10" x2="10" y2="2" stroke="rgba(255,255,255,0.45)" strokeWidth="1.5" strokeLinecap="round"/>
-                <line x1="6" y1="10" x2="10" y2="6" stroke="rgba(255,255,255,0.45)" strokeWidth="1.5" strokeLinecap="round"/>
-              </svg>
-            </div>
-          </div>
-        )}
         {/* Stage silhouette — always visible as backdrop */}
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none">
           <span className="text-[18vw] opacity-[0.04]">{spotlightedP ? "👤" : "🎙️"}</span>
@@ -727,6 +676,58 @@ export function PartyRoomShell({
           </div>
         )}
       </div>
+
+      {/* ── HOST VIDEO PANEL — fixed so z-index works above header/toolbar ── */}
+      {isHost && videoPanelSize.w > 0 && (
+        <div
+          className="overflow-hidden"
+          style={{
+            position: "fixed",
+            left: videoPanelPos.x,
+            top:  videoPanelPos.y,
+            width:  videoPanelSize.w,
+            height: videoPanelSize.h,
+            borderRadius: 14,
+            boxShadow: "0 16px 64px rgba(0,0,0,0.7), 0 0 0 1.5px rgba(255,255,255,0.14)",
+            zIndex: 25,
+          }}
+        >
+          {hostStream ? (
+            <video
+              ref={hostVideoRef}
+              autoPlay
+              muted
+              playsInline
+              className="absolute inset-0 w-full h-full object-cover"
+            />
+          ) : (
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-2"
+              style={{ background: "rgba(8,8,20,0.85)", backdropFilter: "blur(8px)" }}>
+              <span className="text-3xl">📷</span>
+              <span className="text-white/40 text-xs">카메라 연결 중...</span>
+            </div>
+          )}
+          {/* Drag bar */}
+          <div
+            className="absolute top-0 left-0 right-0 h-8 flex items-center px-2.5 cursor-move select-none"
+            style={{ background: "linear-gradient(to bottom, rgba(0,0,0,0.55) 0%, transparent 100%)" }}
+            onMouseDown={startVideoDrag}
+          >
+            <Icon icon="solar:hamburger-menu-bold" className="w-3 h-3 text-white/40" />
+            <span className="text-[9px] text-white/30 ml-1.5">호스트 영상</span>
+          </div>
+          {/* Resize handle SE */}
+          <div
+            className="absolute bottom-0 right-0 w-7 h-7 flex items-end justify-end p-1.5 cursor-se-resize"
+            onMouseDown={startVideoResize}
+          >
+            <svg width="10" height="10" viewBox="0 0 10 10">
+              <line x1="2" y1="10" x2="10" y2="2" stroke="rgba(255,255,255,0.45)" strokeWidth="1.5" strokeLinecap="round"/>
+              <line x1="6" y1="10" x2="10" y2="6" stroke="rgba(255,255,255,0.45)" strokeWidth="1.5" strokeLinecap="round"/>
+            </svg>
+          </div>
+        </div>
+      )}
 
       {/* ── HEADER ── */}
       <header

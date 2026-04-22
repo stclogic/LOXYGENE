@@ -79,6 +79,7 @@ const NAV = [
   { key: "rooms",       label: "룸관리",     icon: "solar:home-smile-bold" },
   { key: "settlements", label: "정산관리",   icon: "solar:wallet-money-bold" },
   { key: "reports",     label: "신고관리",   icon: "solar:shield-warning-bold" },
+  { key: "vvip",        label: "Black 심사", icon: "solar:crown-minimalistic-bold" },
   { key: "logs",        label: "액션 로그",  icon: "solar:clipboard-list-bold" },
   { key: "settings",    label: "시스템설정", icon: "solar:settings-bold" },
 ];
@@ -803,6 +804,225 @@ function SystemSettingsTab() {
   );
 }
 
+// ─── VVIP sidebar badge (reads localStorage) ──────────────────────────────────
+function VVIPBadge() {
+  const [count, setCount] = useState(0);
+  useEffect(() => {
+    const applied = localStorage.getItem("isVVIPApplied") === "true";
+    const isMember = localStorage.getItem("isVVIPMember") === "true";
+    // session applicant + 2 mock pending
+    setCount((applied && !isMember ? 1 : 0) + 2);
+  }, []);
+  if (count === 0) return null;
+  return (
+    <span className="ml-auto text-[10px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: "rgba(201,168,76,0.2)", color: "#C9A84C" }}>
+      {count}
+    </span>
+  );
+}
+
+// ─── Tab: Black 심사 ──────────────────────────────────────────────────────────
+interface VVIPApp {
+  id: string; name: string; email: string; phone: string;
+  bio: string; referral: string; scale: string;
+  appliedAt: string; status: "pending" | "approved" | "rejected";
+  isBrowserSession?: boolean;
+}
+
+const MOCK_VVIP_APPS: VVIPApp[] = [
+  { id: "v1", name: "김재원", email: "jaewon@gmail.com", phone: "010-2345-6789", bio: "파티 기획 10년 경력, 강남 클럽 VJ 출신", referral: "DJ Cyan", scale: "large", appliedAt: "2026-04-20T14:22:00Z", status: "pending" },
+  { id: "v2", name: "박수아", email: "sua@naver.com", phone: "010-9876-5432", bio: "이벤트 MC 및 연예 관련 종사자", referral: "이서연", scale: "mid", appliedAt: "2026-04-21T09:05:00Z", status: "pending" },
+  { id: "v3", name: "이도현", email: "dohyun@kakao.com", phone: "010-1111-2222", bio: "음악 프로듀서, 국내외 페스티벌 참여 다수", referral: "", scale: "director", appliedAt: "2026-04-21T21:40:00Z", status: "approved" },
+  { id: "v4", name: "최예진", email: "yejin@outlook.com", phone: "010-3333-4444", bio: "패션/라이프스타일 인플루언서 팔로워 28만", referral: "한소희", scale: "small", appliedAt: "2026-04-22T00:12:00Z", status: "rejected" },
+];
+
+const SCALE_LABEL: Record<string, string> = {
+  small: "소규모 (≤50명)", mid: "중규모 (≤200명)", large: "대규모 (≤500명)", director: "디렉터급"
+};
+
+function VVIPApplicationsTab() {
+  const [apps, setApps] = useState<VVIPApp[]>(() => {
+    const base = [...MOCK_VVIP_APPS];
+    try {
+      const raw = localStorage.getItem("vvipApplicant");
+      const isMember = localStorage.getItem("isVVIPMember") === "true";
+      const isApplied = localStorage.getItem("isVVIPApplied") === "true";
+      if (isApplied && raw) {
+        const d = JSON.parse(raw);
+        base.unshift({
+          id: "session", name: d.name || "미입력", email: d.email || "미입력",
+          phone: d.phone || "미입력", bio: d.bio || "미입력",
+          referral: d.referral || "", scale: d.scale || "small",
+          appliedAt: d.appliedAt || new Date().toISOString(),
+          status: isMember ? "approved" : "pending",
+          isBrowserSession: true,
+        });
+      }
+    } catch { /* no-op */ }
+    return base;
+  });
+
+  const [filterStatus, setFilterStatus] = useState<"전체" | "pending" | "approved" | "rejected">("전체");
+  const [selectedApp, setSelectedApp] = useState<VVIPApp | null>(null);
+
+  const filtered = filterStatus === "전체" ? apps : apps.filter(a => a.status === filterStatus);
+  const pendingCount = apps.filter(a => a.status === "pending").length;
+
+  const approve = (id: string) => {
+    setApps(prev => prev.map(a => a.id === id ? { ...a, status: "approved" } : a));
+    if (id === "session") {
+      localStorage.setItem("isVVIPMember", "true");
+      localStorage.setItem("isVVIPApplied", "false");
+    }
+    setSelectedApp(prev => prev?.id === id ? { ...prev, status: "approved" } : prev);
+  };
+
+  const reject = (id: string) => {
+    setApps(prev => prev.map(a => a.id === id ? { ...a, status: "rejected" } : a));
+    if (id === "session") {
+      localStorage.removeItem("isVVIPApplied");
+      localStorage.removeItem("vvipApplicant");
+    }
+    setSelectedApp(prev => prev?.id === id ? { ...prev, status: "rejected" } : prev);
+  };
+
+  const GOLD = "#C9A84C";
+
+  return (
+    <div className="flex flex-col gap-5">
+      {/* Summary */}
+      <div className="grid grid-cols-3 gap-4">
+        <KPICard label="전체 신청" value={String(apps.length)} icon="solar:crown-minimalistic-bold" color={GOLD} />
+        <KPICard label="심사 대기" value={String(pendingCount)} sub="즉시 처리 필요" icon="solar:clock-circle-bold" color={WARN} trend={pendingCount > 0 ? "up" : "flat"} />
+        <KPICard label="승인 완료" value={String(apps.filter(a => a.status === "approved").length)} icon="solar:check-circle-bold" color={SUCCESS} />
+      </div>
+
+      {/* Filters */}
+      <div className="flex gap-2 flex-wrap">
+        {(["전체", "pending", "approved", "rejected"] as const).map(s => (
+          <button key={s} onClick={() => setFilterStatus(s)}
+            className="px-3 py-2 rounded-xl text-xs font-medium transition-all"
+            style={filterStatus === s
+              ? { background: `${GOLD}15`, border: `1px solid ${GOLD}40`, color: GOLD }
+              : { background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.4)" }}>
+            {s === "전체" ? "전체" : s === "pending" ? "대기" : s === "approved" ? "승인" : "반려"}
+            {s === "pending" && pendingCount > 0 && (
+              <span className="ml-1.5 text-[9px] font-black px-1 py-0.5 rounded-full" style={{ background: `${WARN}30`, color: WARN }}>{pendingCount}</span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      <div className="flex gap-5">
+        {/* Table */}
+        <div className="flex-1 min-w-0 rounded-2xl overflow-hidden" style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)" }}>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+                  {["이름", "이메일", "규모", "추천인", "신청일", "상태"].map(h => (
+                    <th key={h} className="text-left px-4 py-3 text-white/30 font-medium whitespace-nowrap">{h}</th>
+                  ))}
+                  <th className="px-4 py-3 text-white/30 font-medium">액션</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map(app => (
+                  <tr key={app.id}
+                    onClick={() => setSelectedApp(app)}
+                    className="border-t cursor-pointer transition-colors hover:bg-white/[0.03]"
+                    style={{ borderColor: "rgba(255,255,255,0.04)", background: selectedApp?.id === app.id ? `${GOLD}06` : undefined }}>
+                    <td className="px-4 py-3 font-medium text-white/85 whitespace-nowrap">
+                      {app.isBrowserSession && <span className="mr-1.5 text-[9px] px-1 py-0.5 rounded font-bold" style={{ background: `${ACCENT}20`, color: ACCENT }}>현재세션</span>}
+                      {app.name}
+                    </td>
+                    <td className="px-4 py-3 text-white/40 max-w-[140px] truncate">{app.email}</td>
+                    <td className="px-4 py-3 text-white/50 whitespace-nowrap">{SCALE_LABEL[app.scale] ?? app.scale}</td>
+                    <td className="px-4 py-3 text-white/40">{app.referral || "—"}</td>
+                    <td className="px-4 py-3 text-white/30 whitespace-nowrap">{new Date(app.appliedAt).toLocaleDateString("ko-KR")}</td>
+                    <td className="px-4 py-3">
+                      {app.status === "pending" && <Badge text="심사중" color={WARN} />}
+                      {app.status === "approved" && <Badge text="승인" color={SUCCESS} />}
+                      {app.status === "rejected" && <Badge text="반려" color={DANGER} />}
+                    </td>
+                    <td className="px-4 py-3">
+                      {app.status === "pending" && (
+                        <div className="flex gap-1.5">
+                          <button onClick={e => { e.stopPropagation(); approve(app.id); }}
+                            className="px-2 py-1 rounded-lg text-[10px] font-bold transition-all hover:opacity-80 active:scale-95"
+                            style={{ background: `${GOLD}15`, border: `1px solid ${GOLD}40`, color: GOLD }}>승인</button>
+                          <button onClick={e => { e.stopPropagation(); reject(app.id); }}
+                            className="px-2 py-1 rounded-lg text-[10px] font-bold transition-all hover:opacity-80 active:scale-95"
+                            style={{ background: `${DANGER}15`, border: `1px solid ${DANGER}40`, color: DANGER }}>반려</button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+                {filtered.length === 0 && (
+                  <tr><td colSpan={7} className="px-4 py-12 text-center text-white/20">신청 내역이 없습니다</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Detail panel */}
+        {selectedApp && (
+          <div className="w-72 flex-shrink-0 rounded-2xl p-5 flex flex-col gap-4 self-start sticky top-0"
+            style={{ background: "rgba(255,255,255,0.03)", border: `1px solid ${selectedApp.status === "approved" ? `${GOLD}30` : selectedApp.status === "rejected" ? `${DANGER}20` : "rgba(255,255,255,0.07)"}` }}>
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="font-bold text-white">{selectedApp.name}</p>
+                <p className="text-xs text-white/40 mt-0.5">{selectedApp.email}</p>
+                <p className="text-xs text-white/30">{selectedApp.phone}</p>
+              </div>
+              <button type="button" title="닫기" onClick={() => setSelectedApp(null)} className="text-white/30 hover:text-white/60">
+                <Icon icon="solar:close-circle-bold" className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="flex gap-2 flex-wrap">
+              {selectedApp.status === "pending" && <Badge text="심사중" color={WARN} />}
+              {selectedApp.status === "approved" && <Badge text="승인완료" color={SUCCESS} />}
+              {selectedApp.status === "rejected" && <Badge text="반려" color={DANGER} />}
+              <Badge text={SCALE_LABEL[selectedApp.scale] ?? selectedApp.scale} color={GOLD} />
+            </div>
+            <div className="flex flex-col gap-2 text-xs">
+              {[
+                ["추천인", selectedApp.referral || "없음"],
+                ["신청일", new Date(selectedApp.appliedAt).toLocaleString("ko-KR")],
+              ].map(([k, v]) => (
+                <div key={k} className="flex justify-between gap-2">
+                  <span className="text-white/30 flex-shrink-0">{k}</span>
+                  <span className="text-white/70 font-medium text-right">{v}</span>
+                </div>
+              ))}
+              <div className="flex flex-col gap-1">
+                <span className="text-white/30">소개</span>
+                <p className="text-white/60 leading-relaxed">{selectedApp.bio || "미입력"}</p>
+              </div>
+            </div>
+            {selectedApp.status === "pending" && (
+              <div className="pt-2 border-t flex flex-col gap-2" style={{ borderColor: "rgba(255,255,255,0.06)" }}>
+                <button type="button" onClick={() => approve(selectedApp.id)}
+                  className="w-full py-2.5 rounded-xl text-xs font-bold transition-all hover:opacity-80 active:scale-95"
+                  style={{ background: `${GOLD}15`, border: `1px solid ${GOLD}50`, color: GOLD }}>
+                  🖤 Black 멤버십 승인
+                </button>
+                <button type="button" onClick={() => reject(selectedApp.id)}
+                  className="w-full py-2 rounded-xl text-xs font-bold transition-all hover:opacity-80 active:scale-95"
+                  style={{ background: `${DANGER}10`, border: `1px solid ${DANGER}30`, color: DANGER }}>
+                  반려
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── Tab: 액션 로그 ─────────────────────────────────────────────────────────────
 interface ActionLog {
   id: string;
@@ -955,6 +1175,9 @@ export default function AdminPage() {
                   {pendingReports}
                 </span>
               )}
+              {item.key === "vvip" && (
+                <VVIPBadge />
+              )}
             </button>
           ))}
         </nav>
@@ -1000,6 +1223,7 @@ export default function AdminPage() {
           {activeTab === "rooms" && <RoomsTab terminatedRooms={terminatedRooms} onForceEnd={handleForceEnd} />}
           {activeTab === "settlements" && <SettlementsTab />}
           {activeTab === "reports" && <ReportsTab />}
+          {activeTab === "vvip" && <VVIPApplicationsTab />}
           {activeTab === "logs" && <ActionLogsTab />}
           {activeTab === "settings" && <SystemSettingsTab />}
         </main>

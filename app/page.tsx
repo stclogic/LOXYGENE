@@ -889,6 +889,10 @@ function Home() {
     }
     if (accessCode.toUpperCase() === "BLACK2024") {
       setCodeError("");
+      localStorage.setItem("isVVIPMember", "true");
+      localStorage.setItem("isVVIPApplied", "false");
+      setIsVVIPMember(true);
+      setIsVVIPApplied(false);
       setIsScanning(true);
       setTimeout(() => { setScanDone(true); setTimeout(() => router.push("/rooms/black"), 600); }, 1400);
     } else {
@@ -900,6 +904,11 @@ function Home() {
 
   const handleSignupSubmit = () => {
     localStorage.setItem("isVVIPApplied", "true");
+    localStorage.setItem("vvipApplicant", JSON.stringify({
+      name: formName, phone: formPhone, email: formEmail,
+      bio: formBio, referral: formReferral, scale: formScale,
+      appliedAt: new Date().toISOString(),
+    }));
     setIsVVIPApplied(true);
     setVvipScreen("success");
   };

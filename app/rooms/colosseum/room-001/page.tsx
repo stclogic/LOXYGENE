@@ -176,10 +176,10 @@ export default function ColosseumRoom001Page() {
   const [lastGiftType, setLastGiftType] = useState<"bouquet" | "champagne" | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Karaoke floating panel
-  const [karaokeVideoId, setKaraokeVideoId] = useState<string | null>(null);
+  // Karaoke floating panel — 입장 시 자동 재생
+  const [karaokeVideoId, setKaraokeVideoId] = useState<string | null>("ScifpuOci5E");
   const [karaokeLyrics, setKaraokeLyrics] = useState<string[]>([]);
-  const [karaokeUrlInput, setKaraokeUrlInput] = useState("");
+  const [karaokeUrlInput, setKaraokeUrlInput] = useState("ScifpuOci5E");
   const [karaokeInputOpen, setKaraokeInputOpen] = useState(false);
   const [karaokeUrlError, setKaraokeUrlError] = useState(false);
 

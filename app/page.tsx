@@ -1449,7 +1449,15 @@ function Home() {
 
             {/* Sign-up form */}
             {vvipScreen === "signup" && (
-              <div className="flex flex-col gap-5 p-6 pb-8">
+              <div className="flex flex-col gap-5 p-6 pb-8 relative"
+                style={{
+                  backgroundImage: `url('https://blogger.googleusercontent.com/img/a/AVvXsEiQuYLBKnbhsfWfONeyBPq4xnh02OOcEavNN0hurvGSQwn7m75JxI_bxJaETkqS4yXTYdHvCl1RzFq6_ZQJNNxhjoxphFwJPaBQG6GgzrPjU1GPBWGJegufsgDzJs-Xl4oY6JBUge0qK592ZzlB-PHQy-8Sw36PdJ6yTjlIO4-d9KptJfhTkB9ysYFwsfk')`,
+                  backgroundSize: "cover",
+                  backgroundPosition: "center",
+                  backgroundRepeat: "no-repeat",
+                }}>
+                <div className="absolute inset-0 pointer-events-none" style={{ background: "rgba(4,2,0,0.72)", backdropFilter: "blur(1px)" }} />
+                <div className="relative z-10 flex flex-col gap-5">
                 <div className="flex items-center gap-3 pt-1">
                   <button onClick={() => setVvipScreen("preview")} className="text-xs flex-shrink-0" style={{ color: "rgba(201,168,76,0.4)" }}>←</button>
                   <div>
@@ -1494,6 +1502,7 @@ function Home() {
                   {t.vvip.submitBtn}
                 </button>
                 <button onClick={() => setVvipScreen("preview")} className="text-[11px] text-center transition-colors" style={{ color: "rgba(255,255,255,0.15)" }}>{t.vvip.back}</button>
+                </div>
               </div>
             )}
 

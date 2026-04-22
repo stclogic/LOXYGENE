@@ -9,13 +9,7 @@ import { BottomActionBar } from "@/components/room/BottomActionBar";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { useRoomStore } from "@/lib/store/roomStore";
 import { QuickCallModal } from "@/components/entertainers/QuickCallModal";
-import RoomLoadingScreen from "@/components/room/RoomLoadingScreen";
-
 // Heavy components — lazy-loaded, no SSR (use browser APIs)
-const ZoomVideoRoom = dynamic(
-  () => import("@/components/room/ZoomVideoRoom"),
-  { ssr: false, loading: () => <RoomLoadingScreen /> }
-);
 const ReactiveBackground = dynamic(
   () => import("@/components/room/ReactiveBackground"),
   { ssr: false }
@@ -118,6 +112,18 @@ const nickColor = (nick: string) => {
 export default function ColosseumRoom001Page() {
   // Role
   const [isHost, setIsHost] = useState(true);
+
+  // Broadcast countdown (2 hours = 7200s) — starts on mount
+  const [secondsLeft, setSecondsLeft] = useState(2 * 60 * 60);
+  const [broadcastEnded, setBroadcastEnded] = useState(false);
+  const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const formatCountdown = (s: number) => {
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    const sec = s % 60;
+    return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
+  };
 
   // Ticket
   const [ticketChecked, setTicketChecked] = useState(TICKET_COST === 0);
@@ -257,6 +263,21 @@ export default function ColosseumRoom001Page() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // ── Broadcast countdown ────────────────────────────────────────────────────
+  useEffect(() => {
+    countdownRef.current = setInterval(() => {
+      setSecondsLeft(prev => {
+        if (prev <= 1) {
+          clearInterval(countdownRef.current!);
+          setBroadcastEnded(true);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => { if (countdownRef.current) clearInterval(countdownRef.current); };
+  }, []);
+
   // ── Cleanup ────────────────────────────────────────────────────────────────
   useEffect(() => () => {
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
@@ -292,8 +313,25 @@ export default function ColosseumRoom001Page() {
 
   // ── Handlers ──────────────────────────────────────────────────────────────
   const handleSendMessage = () => {
-    if (!chatInput.trim()) return;
-    setMessages(prev => [...prev, { id: `msg-${Date.now()}`, type: "user", nickname: MY_NICKNAME, text: chatInput.trim(), timestamp: getTs() }]);
+    const text = chatInput.trim();
+    if (!text) return;
+    // Auto-detect song request: "신청: 곡명" or "신청 곡명"
+    const reqMatch = text.match(/^신청[:\s]\s*(.+)$/);
+    if (reqMatch) {
+      const songTitle = reqMatch[1].trim();
+      const newItem: QueueItem = {
+        id: `req-${Date.now()}`,
+        songTitle,
+        artist: "",
+        singerName: MY_NICKNAME,
+        singerId: MY_ID,
+        status: "waiting",
+        pendingApproval: true,
+      };
+      setQueue(prev => [...prev, newItem]);
+      addSysMsg(`🎵 "${songTitle}" 신청이 접수되었습니다`);
+    }
+    setMessages(prev => [...prev, { id: `msg-${Date.now()}`, type: "user", nickname: MY_NICKNAME, text, timestamp: getTs() }]);
     setChatInput("");
   };
 
@@ -378,7 +416,6 @@ export default function ColosseumRoom001Page() {
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <ZoomVideoRoom sessionName="colosseum-room-001" userName={MY_NICKNAME} role={isHost ? "host" : "guest"} onLeave={() => window.location.href = "/"}>
     <div className="flex flex-col bg-[#070707] min-h-screen lg:h-screen lg:overflow-hidden relative overflow-x-hidden">
 
       {/* Background effects layer */}
@@ -503,11 +540,23 @@ export default function ColosseumRoom001Page() {
           <Icon icon="solar:arrow-left-bold" className="w-5 h-5" />
           <span className="text-sm">나가기</span>
         </Link>
-        <div className="flex flex-col items-center">
+        <div className="flex flex-col items-center gap-0.5">
           <h1 className="text-[#00E5FF] font-black text-sm tracking-widest" style={{ textShadow: "0 0 10px rgba(0,229,255,0.5)" }}>
             THE COLOSSEUM
           </h1>
-          <p className="text-white/40 text-xs hidden sm:block">90년대 감성 여행 🎵</p>
+          {/* Countdown timer */}
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 px-2 py-0.5 rounded-full"
+              style={{ background: broadcastEnded ? "rgba(239,68,68,0.15)" : "rgba(239,68,68,0.12)", border: broadcastEnded ? "1px solid rgba(239,68,68,0.5)" : "1px solid rgba(239,68,68,0.3)" }}>
+              <span className={`w-1.5 h-1.5 rounded-full ${broadcastEnded ? "bg-red-500/40" : "bg-red-500 animate-pulse"} block`} />
+              <span className="text-[10px] font-bold text-red-400">{broadcastEnded ? "방송종료" : "LIVE"}</span>
+            </div>
+            {!broadcastEnded && (
+              <span className={`text-[11px] font-mono font-bold tabular-nums ${secondsLeft < 600 ? "text-red-400" : "text-white/50"}`}>
+                {formatCountdown(secondsLeft)}
+              </span>
+            )}
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -1018,6 +1067,25 @@ export default function ColosseumRoom001Page() {
         </div>
       )}
 
+      {/* ── 방송 종료 오버레이 ── */}
+      {broadcastEnded && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center"
+          style={{ background: "rgba(0,0,0,0.92)", backdropFilter: "blur(16px)" }}>
+          <div className="flex flex-col items-center gap-5 text-center px-8">
+            <span className="text-6xl">📺</span>
+            <div>
+              <h2 className="text-white font-black text-2xl">방송이 종료되었습니다</h2>
+              <p className="text-white/40 text-sm mt-2">2시간 방송이 완료되었습니다. 시청해 주셔서 감사합니다!</p>
+            </div>
+            <Link href="/rooms/colosseum"
+              className="px-6 py-3 rounded-xl font-bold text-sm transition-all hover:scale-105"
+              style={{ background: "rgba(0,229,255,0.12)", border: "1px solid rgba(0,229,255,0.4)", color: "#00E5FF" }}>
+              로비로 돌아가기
+            </Link>
+          </div>
+        </div>
+      )}
+
       <style>{`
         .video-container { aspect-ratio: 16 / 9; }
         @media (min-width: 1024px) { .video-container { aspect-ratio: unset; } }
@@ -1027,6 +1095,5 @@ export default function ColosseumRoom001Page() {
         }
       `}</style>
     </div>
-    </ZoomVideoRoom>
   );
 }

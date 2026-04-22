@@ -409,12 +409,6 @@ export default function ColosseumRoom001Page() {
         ← L&apos;OXYGÈNE
       </Link>
 
-      <button onClick={() => setIsHost(h => !h)}
-        className="fixed top-4 left-1/2 -translate-x-1/2 z-50 px-2.5 py-1 rounded text-[10px] font-medium transition-all hover:opacity-80"
-        style={{ background: isHost ? "rgba(0,229,255,0.08)" : "rgba(255,255,255,0.05)", border: isHost ? "1px solid rgba(0,229,255,0.25)" : "1px solid rgba(255,255,255,0.1)", color: isHost ? "#00E5FF" : "rgba(255,255,255,0.4)" }}>
-        {isHost ? "호스트 모드" : "참여자 모드"}
-      </button>
-
       <button onClick={() => setDirectorOpen(true)}
         className="fixed top-14 left-4 z-50 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all hover:scale-105 active:scale-95"
         style={{ background: "rgba(255,0,127,0.1)", border: "1px solid rgba(255,0,127,0.35)", color: "#FF007F", backdropFilter: "blur(12px)", boxShadow: "0 0 12px rgba(255,0,127,0.15)" }}>
@@ -515,9 +509,22 @@ export default function ColosseumRoom001Page() {
           </h1>
           <p className="text-white/40 text-xs hidden sm:block">90년대 감성 여행 🎵</p>
         </div>
-        <div className="flex items-center gap-3">
-          <Icon icon="solar:user-bold" className="text-white/40 w-4 h-4" />
-          <span className="text-white/60 text-sm">127</span>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setIsHost(h => !h)}
+            className="px-2.5 py-1 rounded-lg text-[10px] font-medium transition-all hover:opacity-80"
+            style={{
+              background: isHost ? "rgba(0,229,255,0.1)" : "rgba(255,255,255,0.05)",
+              border: isHost ? "1px solid rgba(0,229,255,0.3)" : "1px solid rgba(255,255,255,0.1)",
+              color: isHost ? "#00E5FF" : "rgba(255,255,255,0.4)",
+            }}
+          >
+            {isHost ? "👑 호스트" : "참여자"}
+          </button>
+          <div className="flex items-center gap-1.5">
+            <Icon icon="solar:user-bold" className="text-white/40 w-4 h-4" />
+            <span className="text-white/60 text-sm">127</span>
+          </div>
         </div>
       </div>
 

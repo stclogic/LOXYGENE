@@ -224,7 +224,7 @@ export function FloatingChat({ roomId, nickname, accentColor = "#00E5FF", onClos
               ta.style.height = Math.min(ta.scrollHeight, 72) + "px";
             }}
             onKeyDown={e => {
-              if (e.key === "Enter" && !e.shiftKey) {
+              if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
                 e.preventDefault();
                 handleSend();
               }

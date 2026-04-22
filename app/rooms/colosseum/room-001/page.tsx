@@ -687,7 +687,7 @@ export default function ColosseumRoom001Page() {
                 <div className="flex items-center gap-2 px-3 py-2 flex-shrink-0"
                   style={{ borderTop: "1px solid rgba(255,255,255,0.05)", background: "rgba(0,0,0,0.4)" }}>
                   <input value={chatInput} onChange={e => setChatInput(e.target.value)}
-                    onKeyDown={e => { if (e.key === "Enter") handleSendMessage(); }}
+                    onKeyDown={e => { if (e.key === "Enter" && !e.nativeEvent.isComposing) handleSendMessage(); }}
                     maxLength={100} placeholder="채팅 입력..."
                     className="flex-1 bg-white/5 text-white/80 text-xs px-3 py-1.5 rounded-lg placeholder-white/25 outline-none"
                     style={{ border: "1px solid rgba(255,255,255,0.08)" }}

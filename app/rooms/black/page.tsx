@@ -19,6 +19,12 @@ export default function BlackLobbyPage() {
   const inputRef = useRef<HTMLInputElement>(null);
   const isAdmin = useIsAdmin();
 
+  // 이 페이지에 도달했다 = 입장 허가됨 → 멤버 확정
+  useEffect(() => {
+    localStorage.setItem("isVVIPMember", "true");
+    localStorage.setItem("isVVIPApplied", "false");
+  }, []);
+
   // Admin: load existing Black rooms + allow creation
   useEffect(() => {
     if (!isAdmin) return;
@@ -30,6 +36,8 @@ export default function BlackLobbyPage() {
 
   const handleSubmit = () => {
     if (code.toUpperCase() === VALID_CODE || code.length >= 4) {
+      localStorage.setItem("isVVIPMember", "true");
+      localStorage.setItem("isVVIPApplied", "false");
       setSubmitted(true);
       setTimeout(() => router.push("/rooms/black/penthouse-1"), 600);
     } else {
@@ -48,7 +56,11 @@ export default function BlackLobbyPage() {
         body: JSON.stringify({ title: "L'OXYGÈNE BLACK — Penthouse", type: "black", maxParticipants: 20 }),
       });
       const data = await res.json();
-      if (data.roomId) router.push(`/rooms/black/${data.roomId}`);
+      if (data.roomId) {
+        localStorage.setItem("isVVIPMember", "true");
+        localStorage.setItem("isVVIPApplied", "false");
+        router.push(`/rooms/black/${data.roomId}`);
+      }
     } finally {
       setCreating(false);
     }
@@ -142,7 +154,7 @@ export default function BlackLobbyPage() {
             )}
 
             {/* Quick enter penthouse-1 (static sample) */}
-            <button onClick={() => router.push("/rooms/black/penthouse-1")}
+            <button onClick={() => { localStorage.setItem("isVVIPMember", "true"); localStorage.setItem("isVVIPApplied", "false"); router.push("/rooms/black/penthouse-1"); }}
               className="w-full py-2.5 rounded-xl text-sm font-light tracking-[0.25em] uppercase transition-all active:scale-95"
               style={{ background: "rgba(201,168,76,0.1)", border: "1px solid rgba(201,168,76,0.35)", color: "#C9A84C" }}>
               샘플 룸 입장 (penthouse-1)

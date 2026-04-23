@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { Icon } from "@iconify/react";
 import { PartyRoomShell } from "@/components/room/PartyRoomShell";
 import { useDailyCall } from "@/hooks/useDailyCall";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
@@ -13,6 +14,96 @@ const MOCK_VIP_GUESTS = [
   { id: "v2", nickname: "VIP 1",  isHost: false, isMuted: false },
   { id: "v3", nickname: "VIP 2",  isHost: false, isMuted: true  },
 ];
+
+function extractYouTubeId(url: string): string | null {
+  const m = url.match(/(?:youtube\.com\/(?:watch\?(?:.*&)?v=|embed\/|shorts\/|live\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+  return m?.[1] ?? (url.match(/^[a-zA-Z0-9_-]{11}$/) ? url : null);
+}
+
+function KaraokePanelContent({
+  onVideoChange,
+  onLyricsChange,
+}: {
+  onVideoChange: (id: string | null) => void;
+  onLyricsChange: (lines: string[]) => void;
+}) {
+  const [urlInput, setUrlInput] = useState("");
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [error, setError] = useState(false);
+  const [lyricsText, setLyricsText] = useState("");
+  const [lyricsMode, setLyricsMode] = useState<"view" | "edit">("view");
+
+  const handleLoad = () => {
+    const id = extractYouTubeId(urlInput.trim());
+    if (id) { setActiveId(id); onVideoChange(id); setError(false); }
+    else setError(true);
+  };
+  const handleClear = () => {
+    setActiveId(null); setUrlInput(""); setError(false); onVideoChange(null);
+  };
+  const handleLyricsChange = (text: string) => {
+    setLyricsText(text);
+    onLyricsChange(text.split("\n").filter(l => l.trim()));
+  };
+  const lyricsLines = lyricsText.split("\n").filter(l => l.trim());
+
+  return (
+    <div className="flex flex-col gap-4 p-4">
+      <div>
+        <p className="text-[10px] tracking-widest font-medium mb-2" style={{ color: "rgba(212,175,55,0.5)" }}>유튜브 영상</p>
+        <div className="flex gap-2">
+          <input
+            value={urlInput}
+            onChange={e => { setUrlInput(e.target.value); setError(false); }}
+            onKeyDown={e => { if (e.key === "Enter" && !e.nativeEvent.isComposing) handleLoad(); }}
+            placeholder="YouTube URL 또는 영상 ID"
+            className="flex-1 min-w-0 px-3 py-2 rounded-lg text-xs text-white outline-none placeholder-white/20"
+            style={{ background: "rgba(212,175,55,0.04)", border: `1px solid ${error ? "rgba(239,68,68,0.5)" : "rgba(212,175,55,0.18)"}` }}
+          />
+          {activeId ? (
+            <button type="button" onClick={handleClear} className="flex-shrink-0 px-3 py-2 rounded-lg text-xs font-medium"
+              style={{ background: "rgba(239,68,68,0.12)", border: "1px solid rgba(239,68,68,0.3)", color: "#ef4444" }}>중지</button>
+          ) : (
+            <button type="button" onClick={handleLoad} className="flex-shrink-0 px-3 py-2 rounded-lg text-xs font-medium"
+              style={{ background: "rgba(212,175,55,0.12)", border: "1px solid rgba(212,175,55,0.3)", color: ACCENT }}>재생</button>
+          )}
+        </div>
+        {error && <p className="text-[10px] text-red-400 mt-1">올바른 YouTube URL을 입력해주세요.</p>}
+        {activeId && (
+          <div className="flex items-center gap-2 mt-2 px-2 py-1.5 rounded-lg"
+            style={{ background: "rgba(212,175,55,0.06)", border: "1px solid rgba(212,175,55,0.2)" }}>
+            <span className="w-1.5 h-1.5 rounded-full animate-pulse block flex-shrink-0" style={{ background: ACCENT }} />
+            <span className="text-[10px] truncate" style={{ color: ACCENT }}>재생 중 · 무대 화면을 확인하세요</span>
+          </div>
+        )}
+      </div>
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-[10px] tracking-widest font-medium" style={{ color: "rgba(212,175,55,0.5)" }}>가사</p>
+          <button type="button" onClick={() => setLyricsMode(m => m === "edit" ? "view" : "edit")}
+            className="text-[10px] px-2 py-0.5 rounded transition-all"
+            style={{ background: lyricsMode === "edit" ? "rgba(212,175,55,0.12)" : "rgba(255,255,255,0.05)", border: `1px solid ${lyricsMode === "edit" ? "rgba(212,175,55,0.3)" : "rgba(255,255,255,0.1)"}`, color: lyricsMode === "edit" ? ACCENT : "rgba(255,255,255,0.4)" }}>
+            {lyricsMode === "edit" ? "완료" : "가사 입력"}
+          </button>
+        </div>
+        {lyricsMode === "edit" ? (
+          <textarea value={lyricsText} onChange={e => handleLyricsChange(e.target.value)}
+            placeholder={"가사를 붙여넣거나 직접 입력하세요.\n한 줄씩 입력하면 화면에 표시됩니다."}
+            rows={8} className="w-full px-3 py-2 rounded-lg text-xs text-white outline-none placeholder-white/20 resize-none"
+            style={{ background: "rgba(212,175,55,0.03)", border: "1px solid rgba(212,175,55,0.2)", lineHeight: 1.7 }} />
+        ) : lyricsLines.length > 0 ? (
+          <div className="flex flex-col gap-1 max-h-48 overflow-y-auto" style={{ scrollbarWidth: "none" }}>
+            {lyricsLines.map((line, i) => (
+              <p key={i} className="text-sm leading-relaxed px-1" style={{ color: "rgba(255,255,255,0.75)" }}>{line}</p>
+            ))}
+          </div>
+        ) : (
+          <p className="text-xs px-1" style={{ color: "rgba(255,255,255,0.2)" }}>가사 입력 버튼을 눌러 가사를 추가하면 무대 하단에 표시됩니다.</p>
+        )}
+      </div>
+    </div>
+  );
+}
 
 function generateOTP() {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -120,6 +211,9 @@ export default function BlackRoomPage({ params }: { params: { roomId: string } }
   const [dailyRoomUrl, setDailyRoomUrl] = useState("");
   const [role, setRole] = useState<string>("participant");
   const [otp, setOtp] = useState("7X9K-M2PQ");
+  const [vipModalOpen, setVipModalOpen] = useState(false);
+  const [karaokeVideoId, setKaraokeVideoId] = useState<string | null>(null);
+  const [karaokeLyrics, setKaraokeLyrics] = useState<string[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const isSuperAdmin = useIsAdmin();
@@ -169,10 +263,15 @@ export default function BlackRoomPage({ params }: { params: { roomId: string } }
         backHref="/rooms/black"
         accentColor={ACCENT}
         participantCount={Object.keys(dailyParticipants).length || 8}
-        panelTitle="👑 VIP 컨트롤"
+        panelTitle="🎤 노래방"
         panelContent={
-          <VIPPanelContent otp={otp} onRegenerateOtp={() => setOtp(generateOTP())} />
+          <KaraokePanelContent
+            onVideoChange={id => setKaraokeVideoId(id)}
+            onLyricsChange={lines => setKaraokeLyrics(lines)}
+          />
         }
+        karaokeVideoId={karaokeVideoId ?? undefined}
+        karaokeLyrics={karaokeLyrics}
         dailyParticipants={dailyParticipants}
         roomId={params.roomId}
         nickname={currentNickname}
@@ -182,14 +281,34 @@ export default function BlackRoomPage({ params }: { params: { roomId: string } }
         onToggleCamera={toggleCamera}
       />
 
-      {/* VIP room badge */}
-      <div
-        className="fixed top-16 right-4 z-50 flex items-center gap-1.5 px-3 py-1.5 rounded-lg pointer-events-none"
+      {/* VIP 컨트롤 버튼 */}
+      <button
+        type="button"
+        onClick={() => setVipModalOpen(true)}
+        className="fixed top-16 right-4 z-50 flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all hover:opacity-80"
         style={{ background: "rgba(212,175,55,0.08)", border: "1px solid rgba(212,175,55,0.2)", backdropFilter: "blur(12px)" }}
       >
         <span className="text-sm">👑</span>
-        <span className="text-[10px] font-semibold tracking-wider" style={{ color: "rgba(212,175,55,0.7)" }}>VIP ROOM</span>
-      </div>
+        <span className="text-[10px] font-semibold tracking-wider" style={{ color: "rgba(212,175,55,0.7)" }}>VIP 컨트롤</span>
+      </button>
+
+      {/* VIP 컨트롤 모달 */}
+      {vipModalOpen && (
+        <div className="fixed inset-0 z-[75] flex items-center justify-center px-4"
+          style={{ background: "rgba(0,0,0,0.85)", backdropFilter: "blur(12px)" }}
+          onClick={e => { if (e.target === e.currentTarget) setVipModalOpen(false); }}>
+          <div className="w-full max-w-sm rounded-2xl overflow-hidden"
+            style={{ background: "rgba(4,3,2,0.99)", border: "1px solid rgba(212,175,55,0.2)", boxShadow: "0 0 60px rgba(212,175,55,0.08)" }}>
+            <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: "rgba(212,175,55,0.1)" }}>
+              <span className="text-sm font-bold tracking-widest" style={{ color: ACCENT }}>👑 VIP 컨트롤</span>
+              <button type="button" title="닫기" onClick={() => setVipModalOpen(false)} className="text-white/30 hover:text-white/60">
+                <Icon icon="solar:close-circle-bold" className="w-5 h-5" />
+              </button>
+            </div>
+            <VIPPanelContent otp={otp} onRegenerateOtp={() => setOtp(generateOTP())} />
+          </div>
+        </div>
+      )}
 
       {/* Nickname modal */}
       {nicknameModalOpen && (

@@ -343,6 +343,21 @@ export function PartyRoomShell({
   const [fnbMenu, setFnbMenu] = useState<Record<string, { id: string; name: string; price_coins: number; delivery_minutes: number }[]>>({});
   const [fnbToast, setFnbToast] = useState("");
 
+  // Fullscreen
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  useEffect(() => {
+    const onChange = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener("fullscreenchange", onChange);
+    return () => document.removeEventListener("fullscreenchange", onChange);
+  }, []);
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch(() => {});
+    } else {
+      document.exitFullscreen().catch(() => {});
+    }
+  };
+
   // Camera background mode
   const [bgMode, setBgMode] = useState<"gradient" | "camera">("gradient");
   const [hostStream, setHostStream] = useState<MediaStream | null>(null);
@@ -759,6 +774,18 @@ export function PartyRoomShell({
             <Icon icon="solar:user-bold" className="text-white/30 w-3.5 h-3.5" />
             <span className="text-white/50 text-xs">{participantCount}</span>
           </div>
+          <button
+            type="button"
+            title={isFullscreen ? "전체화면 종료 (ESC)" : "전체화면"}
+            onClick={toggleFullscreen}
+            className="flex items-center justify-center w-7 h-7 rounded-lg transition-all hover:opacity-80 active:scale-95"
+            style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)" }}
+          >
+            <Icon
+              icon={isFullscreen ? "solar:quit-full-screen-bold" : "solar:full-screen-bold"}
+              className="w-3.5 h-3.5 text-white/50"
+            />
+          </button>
         </div>
       </header>
 
@@ -1319,65 +1346,103 @@ export function PartyRoomShell({
       </div>
     </div>
 
-    {/* ── F&B DELIVERY DRAWER ── */}
+    {/* ── F&B DELIVERY MODAL ── */}
     {fnbOpen && (
       <>
-        <div className="fixed inset-0 z-40" style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}
+        <div className="fixed inset-0 z-40" style={{ background: "rgba(0,0,0,0.75)", backdropFilter: "blur(8px)" }}
           onClick={() => setFnbOpen(false)} />
-        <div className="fixed left-0 right-0 bottom-0 z-50 flex flex-col rounded-t-2xl overflow-hidden"
-          style={{ height: "65vh", background: "#0a0f1e", borderTop: "1px solid rgba(255,0,127,0.2)" }}>
-          <div className="flex items-center justify-between px-5 py-4 border-b flex-shrink-0"
-            style={{ borderColor: "rgba(255,255,255,0.07)" }}>
-            <div>
-              <p className="text-white font-bold">🥂 F&B 딜리버리</p>
-              <p className="text-[11px] text-white/30 mt-0.5">코인으로 음료·음식을 주문하세요</p>
-            </div>
-            <button type="button" aria-label="닫기" onClick={() => setFnbOpen(false)} className="text-white/30 hover:text-white/60 transition-colors">
-              <Icon icon="solar:close-circle-bold" className="w-5 h-5" />
-            </button>
-          </div>
-          <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-4" style={{ scrollbarWidth: "none" }}>
-            {Object.keys(fnbMenu).length === 0 && (
-              <div className="text-center py-8 text-white/25 text-sm">메뉴 불러오는 중...</div>
-            )}
-            {Object.entries(fnbMenu).map(([cat, items]) => (
-              <div key={cat}>
-                <p className="text-[10px] font-bold tracking-widest text-white/30 mb-2">
-                  {cat === "premium" ? "🥂 PREMIUM" : cat === "drinks" ? "🍸 DRINKS" : "🍽️ FOOD"}
-                </p>
-                <div className="flex flex-col gap-2">
-                  {items.map(item => (
-                    <div key={item.id} className="flex items-center gap-3 p-3 rounded-xl"
-                      style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-white/90 truncate">{item.name}</p>
-                        <p className="text-[11px] font-bold mt-0.5" style={{ color: "#FFD700" }}>
-                          {item.price_coins.toLocaleString()} O₂ · {item.delivery_minutes}분
-                        </p>
-                      </div>
-                      <button type="button"
-                        onClick={async () => {
-                          const res = await fetch("/api/fnb/order", {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ itemId: item.id, quantity: 1 }),
-                          }).then(r => r.json()).catch(() => null);
-                          setFnbOpen(false);
-                          const msg = res?.orderId
-                            ? `🥂 주문이 접수됐어요! ${item.delivery_minutes}분 후 도착`
-                            : "❌ 주문 실패. 코인 잔액을 확인하세요.";
-                          setFnbToast(msg);
-                          setTimeout(() => setFnbToast(""), 4000);
-                        }}
-                        className="flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold transition-all active:scale-95"
-                        style={{ background: "rgba(255,0,127,0.12)", border: "1px solid rgba(255,0,127,0.3)", color: "#FF007F" }}>
-                        주문
-                      </button>
-                    </div>
-                  ))}
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4 pointer-events-none">
+          <div className="pointer-events-auto w-full max-w-sm flex flex-col rounded-2xl overflow-hidden"
+            style={{
+              maxHeight: "72vh",
+              background: "linear-gradient(160deg, #0d0a00 0%, #120c00 50%, #0a0800 100%)",
+              border: "1px solid rgba(255,215,0,0.25)",
+              boxShadow: "0 0 0 1px rgba(255,215,0,0.08), 0 24px 64px rgba(0,0,0,0.8), 0 0 40px rgba(255,180,0,0.08)",
+            }}>
+
+            {/* Header */}
+            <div className="relative flex items-center justify-between px-5 py-4 flex-shrink-0 overflow-hidden"
+              style={{ background: "linear-gradient(135deg, rgba(255,180,0,0.12) 0%, rgba(255,100,0,0.06) 100%)", borderBottom: "1px solid rgba(255,215,0,0.15)" }}>
+              {/* Shimmer line */}
+              <div className="absolute inset-x-0 top-0 h-px" style={{ background: "linear-gradient(90deg, transparent, rgba(255,215,0,0.6), transparent)" }} />
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                  style={{ background: "rgba(255,180,0,0.15)", border: "1px solid rgba(255,215,0,0.3)" }}>
+                  <span className="text-lg leading-none">🥂</span>
+                </div>
+                <div>
+                  <p className="font-black text-sm tracking-wide" style={{ color: "#FFD700" }}>F&B 딜리버리</p>
+                  <p className="text-[10px] tracking-widest mt-0.5" style={{ color: "rgba(255,215,0,0.4)" }}>O₂ COIN으로 주문하세요</p>
                 </div>
               </div>
-            ))}
+              <button type="button" aria-label="닫기" onClick={() => setFnbOpen(false)}
+                className="text-white/20 hover:text-white/60 transition-colors">
+                <Icon icon="solar:close-circle-bold" className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Menu list */}
+            <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-4" style={{ scrollbarWidth: "none" }}>
+              {Object.keys(fnbMenu).length === 0 && (
+                <div className="text-center py-10 text-white/20 text-sm">메뉴 불러오는 중...</div>
+              )}
+              {Object.entries(fnbMenu).map(([cat, items]) => (
+                <div key={cat}>
+                  <p className="text-[9px] font-black tracking-[0.25em] mb-2.5"
+                    style={{ color: "rgba(255,215,0,0.4)" }}>
+                    {cat === "premium" ? "✦ PREMIUM" : cat === "drinks" ? "✦ DRINKS" : "✦ FOOD"}
+                  </p>
+                  <div className="flex flex-col gap-2">
+                    {items.map(item => (
+                      <div key={item.id}
+                        className="flex items-center gap-3 px-3 py-2.5 rounded-xl"
+                        style={{ background: "rgba(255,215,0,0.03)", border: "1px solid rgba(255,215,0,0.1)" }}>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-white/85 truncate">{item.name}</p>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            <span className="text-[10px] font-black tabular-nums" style={{ color: "#FFD700" }}>
+                              {item.price_coins.toLocaleString()} O₂
+                            </span>
+                            <span className="text-white/20 text-[10px]">·</span>
+                            <span className="text-[10px] text-white/35">{item.delivery_minutes}분</span>
+                          </div>
+                        </div>
+                        <button type="button"
+                          onClick={async () => {
+                            const res = await fetch("/api/fnb/order", {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ itemId: item.id, quantity: 1 }),
+                            }).then(r => r.json()).catch(() => null);
+                            setFnbOpen(false);
+                            const msg = res?.orderId
+                              ? `🥂 주문이 접수됐어요! ${item.delivery_minutes}분 후 도착`
+                              : "❌ 주문 실패. 코인 잔액을 확인하세요.";
+                            setFnbToast(msg);
+                            setTimeout(() => setFnbToast(""), 4000);
+                          }}
+                          className="flex-shrink-0 px-3.5 py-2 rounded-xl text-[11px] font-black tracking-wider transition-all active:scale-95 hover:opacity-90"
+                          style={{
+                            background: "linear-gradient(135deg, rgba(255,180,0,0.2), rgba(255,120,0,0.15))",
+                            border: "1px solid rgba(255,215,0,0.35)",
+                            color: "#FFD700",
+                          }}>
+                          주문
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Footer */}
+            <div className="px-4 py-3 flex-shrink-0"
+              style={{ borderTop: "1px solid rgba(255,215,0,0.1)", background: "rgba(255,180,0,0.03)" }}>
+              <p className="text-[10px] text-center" style={{ color: "rgba(255,215,0,0.3)" }}>
+                주문 후 취소는 불가합니다 · 코인 부족 시 자동 실패
+              </p>
+            </div>
           </div>
         </div>
       </>

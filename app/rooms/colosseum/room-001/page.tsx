@@ -182,10 +182,19 @@ export default function ColosseumRoom001Page() {
   const [lastGiftType, setLastGiftType] = useState<"bouquet" | "champagne" | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Karaoke floating panel — 입장 시 자동 재생
-  const [karaokeVideoId, setKaraokeVideoId] = useState<string | null>("ScifpuOci5E");
+  // ── BGM (상시 재생, 30% 볼륨) ──────────────────────────────────────────────
+  const BGM_ID = "ISrBAxw12bk";
+  const bgmRef = useRef<HTMLIFrameElement>(null);
+  const bgmUnlockedRef = useRef(false);
+
+  // ── 메인 무대 영상 (기본 정지) ──────────────────────────────────────────────
+  const MAIN_VIDEO_ID = "joCz5tmXAcI";
+  const [mainVideoPlaying, setMainVideoPlaying] = useState(false);
+
+  // ── 노래방 플로팅 패널 ────────────────────────────────────────────────────
+  const [karaokeVideoId, setKaraokeVideoId] = useState<string | null>(null);
   const [karaokeLyrics, setKaraokeLyrics] = useState<string[]>([]);
-  const [karaokeUrlInput, setKaraokeUrlInput] = useState("ScifpuOci5E");
+  const [karaokeUrlInput, setKaraokeUrlInput] = useState("");
   const [karaokeInputOpen, setKaraokeInputOpen] = useState(false);
   const [karaokeUrlError, setKaraokeUrlError] = useState(false);
 
@@ -234,6 +243,26 @@ export default function ColosseumRoom001Page() {
     const t = setTimeout(() => { setLastGift(null); setLastGiftType(null); }, 2000);
     return () => clearTimeout(t);
   }, [gifts]);
+
+  // ── BGM 제스처 언락 (브라우저 autoplay 정책 대응) ─────────────────────────
+  useEffect(() => {
+    const unlock = () => {
+      if (bgmUnlockedRef.current) return;
+      bgmUnlockedRef.current = true;
+      const win = bgmRef.current?.contentWindow;
+      if (!win) return;
+      win.postMessage(JSON.stringify({ event: "command", func: "unMute" }), "*");
+      win.postMessage(JSON.stringify({ event: "command", func: "setVolume", args: [30] }), "*");
+    };
+    document.addEventListener("click", unlock, { once: true });
+    document.addEventListener("keydown", unlock, { once: true });
+    document.addEventListener("touchstart", unlock, { once: true });
+    return () => {
+      document.removeEventListener("click", unlock);
+      document.removeEventListener("keydown", unlock);
+      document.removeEventListener("touchstart", unlock);
+    };
+  }, []);
 
   // ── Outside click for search ───────────────────────────────────────────────
   useEffect(() => {
@@ -1036,9 +1065,53 @@ export default function ColosseumRoom001Page() {
         </FloatingPanel>
       )}
 
-      {/* ── 가라오케 플로팅 패널 ── */}
+      {/* ── BGM 숨겨진 iframe (상시 재생, muted → 제스처 후 30% 언락) ── */}
+      <iframe
+        ref={bgmRef}
+        title="BGM"
+        src={`https://www.youtube.com/embed/${BGM_ID}?autoplay=1&mute=1&loop=1&playlist=${BGM_ID}&controls=0&enablejsapi=1`}
+        allow="autoplay"
+        style={{ position: "fixed", width: 1, height: 1, opacity: 0, pointerEvents: "none", bottom: 0, left: 0 }}
+      />
+
+      {/* ── 메인 무대 영상 패널 (기본 정지, 재생 버튼 클릭 시 소리 활성화) ── */}
+      <FloatingPanel defaultW={680} aspectRatio={16 / 9} zIndex={60}>
+        {mainVideoPlaying ? (
+          <iframe
+            key="main-playing"
+            title="메인 무대"
+            src={`https://www.youtube.com/embed/${MAIN_VIDEO_ID}?rel=0&modestbranding=1&autoplay=1`}
+            allow="autoplay; encrypted-media; fullscreen"
+            allowFullScreen
+            className="absolute inset-0 w-full h-full border-0"
+          />
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center"
+            style={{ backgroundImage: `url(https://img.youtube.com/vi/${MAIN_VIDEO_ID}/maxresdefault.jpg)`, backgroundSize: "cover", backgroundPosition: "center" }}>
+            <div className="absolute inset-0" style={{ background: "rgba(0,0,0,0.45)" }} />
+            <button
+              type="button"
+              onClick={() => {
+                setMainVideoPlaying(true);
+                // BGM 뮤트 (영상 소리와 충돌 방지)
+                bgmRef.current?.contentWindow?.postMessage(
+                  JSON.stringify({ event: "command", func: "mute" }), "*"
+                );
+              }}
+              className="relative z-10 w-20 h-20 rounded-full flex items-center justify-center transition-all hover:scale-110 active:scale-95"
+              title="재생"
+              style={{ background: "rgba(255,255,255,0.18)", border: "2px solid rgba(255,255,255,0.7)", backdropFilter: "blur(6px)" }}
+            >
+              <Icon icon="solar:play-bold" className="w-9 h-9 text-white" style={{ marginLeft: 4 }} />
+            </button>
+            <p className="absolute bottom-3 left-0 right-0 text-center text-[11px] text-white/50 tracking-wider">클릭하여 재생</p>
+          </div>
+        )}
+      </FloatingPanel>
+
+      {/* ── 노래방 플로팅 패널 (사용자 URL 입력) ── */}
       {karaokeVideoId && (
-        <FloatingPanel key={karaokeVideoId} defaultW={680} aspectRatio={16 / 9} zIndex={60}>
+        <FloatingPanel key={karaokeVideoId} defaultW={640} aspectRatio={16 / 9} zIndex={65}>
           <iframe
             title="노래방 유튜브"
             src={`https://www.youtube.com/embed/${karaokeVideoId}?rel=0&modestbranding=1&autoplay=1`}

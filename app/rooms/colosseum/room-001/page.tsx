@@ -252,7 +252,7 @@ export default function ColosseumRoom001Page() {
       const win = bgmRef.current?.contentWindow;
       if (!win) return;
       win.postMessage(JSON.stringify({ event: "command", func: "unMute" }), "*");
-      win.postMessage(JSON.stringify({ event: "command", func: "setVolume", args: [30] }), "*");
+      win.postMessage(JSON.stringify({ event: "command", func: "setVolume", args: [50] }), "*");
     };
     document.addEventListener("click", unlock, { once: true });
     document.addEventListener("keydown", unlock, { once: true });

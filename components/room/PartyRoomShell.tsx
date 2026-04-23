@@ -869,7 +869,7 @@ export function PartyRoomShell({
                     filter: dimmedDockItems.has(p.id) ? "grayscale(0.8)" : "none",
                     transition: "opacity 0.3s ease, filter 0.3s ease",
                   }}
-                  onClick={e => { e.stopPropagation(); if (!hidden) toggleDockDim(p.id); }}
+                  onClick={e => { e.stopPropagation(); hidden ? toggleParticipantVisibility(p.id) : toggleDockDim(p.id); }}
                   onContextMenu={e => { e.preventDefault(); e.stopPropagation(); if (!hidden) setContextMenu({ x: e.clientX, y: e.clientY, pid: p.id, name: p.name }); }}
                 >
                   {/* Avatar tile */}
@@ -904,7 +904,7 @@ export function PartyRoomShell({
                         type="button"
                         aria-label="화면 숨기기"
                         onClick={e => { e.stopPropagation(); toggleParticipantVisibility(p.id); }}
-                        className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-2xl"
+                        className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto transition-opacity flex items-center justify-center rounded-2xl"
                       >
                         <Icon icon="solar:eye-slash-bold" className="w-4 h-4 text-white/70" />
                       </button>

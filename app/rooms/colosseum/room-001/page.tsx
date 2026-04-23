@@ -17,6 +17,7 @@ const ReactiveBackground = dynamic(
 
 // Other room components
 import { FloatingPanel } from "@/components/room/PartyRoomShell";
+import { YouTubeBackgroundPlayer } from "@/components/room/YouTubeBackgroundPlayer";
 import MainStage from "@/components/room/MainStage";
 import ParticipantRow, { type RoomParticipant } from "@/components/room/ParticipantRow";
 import VoiceScoreDisplay from "@/components/room/VoiceScoreDisplay";
@@ -182,10 +183,7 @@ export default function ColosseumRoom001Page() {
   const [lastGiftType, setLastGiftType] = useState<"bouquet" | "champagne" | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // ── BGM (상시 재생, 30% 볼륨) ──────────────────────────────────────────────
-  const BGM_ID = "ISrBAxw12bk";
-  const bgmRef = useRef<HTMLIFrameElement>(null);
-  const bgmUnlockedRef = useRef(false);
+  // ── 메인 무대 영상 (기본 정지) ──────────────────────────────────────────────
 
   // ── 메인 무대 영상 (기본 정지) ──────────────────────────────────────────────
   const MAIN_VIDEO_ID = "joCz5tmXAcI";
@@ -244,25 +242,6 @@ export default function ColosseumRoom001Page() {
     return () => clearTimeout(t);
   }, [gifts]);
 
-  // ── BGM 제스처 언락 (브라우저 autoplay 정책 대응) ─────────────────────────
-  useEffect(() => {
-    const unlock = () => {
-      if (bgmUnlockedRef.current) return;
-      bgmUnlockedRef.current = true;
-      const win = bgmRef.current?.contentWindow;
-      if (!win) return;
-      win.postMessage(JSON.stringify({ event: "command", func: "unMute" }), "*");
-      win.postMessage(JSON.stringify({ event: "command", func: "setVolume", args: [50] }), "*");
-    };
-    document.addEventListener("click", unlock, { once: true });
-    document.addEventListener("keydown", unlock, { once: true });
-    document.addEventListener("touchstart", unlock, { once: true });
-    return () => {
-      document.removeEventListener("click", unlock);
-      document.removeEventListener("keydown", unlock);
-      document.removeEventListener("touchstart", unlock);
-    };
-  }, []);
 
   // ── Outside click for search ───────────────────────────────────────────────
   useEffect(() => {
@@ -588,6 +567,7 @@ export default function ColosseumRoom001Page() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <YouTubeBackgroundPlayer videoId="ISrBAxw12bk" maxVolume={50} />
           <button
             onClick={() => setIsHost(h => !h)}
             className="px-2.5 py-1 rounded-lg text-[10px] font-medium transition-all hover:opacity-80"
@@ -1065,14 +1045,8 @@ export default function ColosseumRoom001Page() {
         </FloatingPanel>
       )}
 
-      {/* ── BGM 숨겨진 iframe (상시 재생, muted → 제스처 후 30% 언락) ── */}
-      <iframe
-        ref={bgmRef}
-        title="BGM"
-        src={`https://www.youtube.com/embed/${BGM_ID}?autoplay=1&mute=1&loop=1&playlist=${BGM_ID}&controls=0&enablejsapi=1`}
-        allow="autoplay"
-        style={{ position: "fixed", width: 1, height: 1, opacity: 0, pointerEvents: "none", bottom: 0, left: 0 }}
-      />
+      {/* ── BGM (YouTubeBackgroundPlayer — 버튼 + 이퀄라이저 포함) ── */}
+      {/* 버튼은 헤더 우측에 렌더링, 여기선 플레이어만 마운트 */}
 
       {/* ── 메인 무대 영상 패널 (기본 정지, 재생 버튼 클릭 시 소리 활성화) ── */}
       <FloatingPanel defaultW={680} aspectRatio={16 / 9} zIndex={60}>
@@ -1091,13 +1065,7 @@ export default function ColosseumRoom001Page() {
             <div className="absolute inset-0" style={{ background: "rgba(0,0,0,0.45)" }} />
             <button
               type="button"
-              onClick={() => {
-                setMainVideoPlaying(true);
-                // BGM 뮤트 (영상 소리와 충돌 방지)
-                bgmRef.current?.contentWindow?.postMessage(
-                  JSON.stringify({ event: "command", func: "mute" }), "*"
-                );
-              }}
+              onClick={() => setMainVideoPlaying(true)}
               className="relative z-10 w-20 h-20 rounded-full flex items-center justify-center transition-all hover:scale-110 active:scale-95"
               title="재생"
               style={{ background: "rgba(255,255,255,0.18)", border: "2px solid rgba(255,255,255,0.7)", backdropFilter: "blur(6px)" }}

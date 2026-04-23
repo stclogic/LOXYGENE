@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Icon } from "@iconify/react";
@@ -825,65 +825,64 @@ function VVIPBadge() {
 interface VVIPApp {
   id: string; name: string; email: string; phone: string;
   bio: string; referral: string; scale: string;
-  appliedAt: string; status: "pending" | "approved" | "rejected";
-  isBrowserSession?: boolean;
+  applied_at: string; status: "pending" | "approved" | "rejected";
 }
-
-const MOCK_VVIP_APPS: VVIPApp[] = [
-  { id: "v1", name: "김재원", email: "jaewon@gmail.com", phone: "010-2345-6789", bio: "파티 기획 10년 경력, 강남 클럽 VJ 출신", referral: "DJ Cyan", scale: "large", appliedAt: "2026-04-20T14:22:00Z", status: "pending" },
-  { id: "v2", name: "박수아", email: "sua@naver.com", phone: "010-9876-5432", bio: "이벤트 MC 및 연예 관련 종사자", referral: "이서연", scale: "mid", appliedAt: "2026-04-21T09:05:00Z", status: "pending" },
-  { id: "v3", name: "이도현", email: "dohyun@kakao.com", phone: "010-1111-2222", bio: "음악 프로듀서, 국내외 페스티벌 참여 다수", referral: "", scale: "director", appliedAt: "2026-04-21T21:40:00Z", status: "approved" },
-  { id: "v4", name: "최예진", email: "yejin@outlook.com", phone: "010-3333-4444", bio: "패션/라이프스타일 인플루언서 팔로워 28만", referral: "한소희", scale: "small", appliedAt: "2026-04-22T00:12:00Z", status: "rejected" },
-];
 
 const SCALE_LABEL: Record<string, string> = {
   small: "소규모 (≤50명)", mid: "중규모 (≤200명)", large: "대규모 (≤500명)", director: "디렉터급"
 };
 
 function VVIPApplicationsTab() {
-  const [apps, setApps] = useState<VVIPApp[]>(() => {
-    const base = [...MOCK_VVIP_APPS];
-    try {
-      const raw = localStorage.getItem("vvipApplicant");
-      const isMember = localStorage.getItem("isVVIPMember") === "true";
-      const isApplied = localStorage.getItem("isVVIPApplied") === "true";
-      if (isApplied && raw) {
-        const d = JSON.parse(raw);
-        base.unshift({
-          id: "session", name: d.name || "미입력", email: d.email || "미입력",
-          phone: d.phone || "미입력", bio: d.bio || "미입력",
-          referral: d.referral || "", scale: d.scale || "small",
-          appliedAt: d.appliedAt || new Date().toISOString(),
-          status: isMember ? "approved" : "pending",
-          isBrowserSession: true,
-        });
-      }
-    } catch { /* no-op */ }
-    return base;
-  });
-
+  const [apps, setApps] = useState<VVIPApp[]>([]);
+  const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState<"전체" | "pending" | "approved" | "rejected">("전체");
   const [selectedApp, setSelectedApp] = useState<VVIPApp | null>(null);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/vvip/applications");
+      if (!res.ok) throw new Error(res.statusText);
+      const data = await res.json();
+      setApps(data.applications ?? []);
+    } catch {
+      setApps([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
 
   const filtered = filterStatus === "전체" ? apps : apps.filter(a => a.status === filterStatus);
   const pendingCount = apps.filter(a => a.status === "pending").length;
 
-  const approve = (id: string) => {
+  const approve = async (id: string) => {
+    setActionLoading(id);
+    // 낙관적 업데이트
     setApps(prev => prev.map(a => a.id === id ? { ...a, status: "approved" } : a));
-    if (id === "session") {
-      localStorage.setItem("isVVIPMember", "true");
-      localStorage.setItem("isVVIPApplied", "false");
-    }
     setSelectedApp(prev => prev?.id === id ? { ...prev, status: "approved" } : prev);
+    try {
+      await fetch("/api/vvip/approve", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+    } catch { load(); }
+    setActionLoading(null);
   };
 
-  const reject = (id: string) => {
+  const reject = async (id: string) => {
+    setActionLoading(id);
     setApps(prev => prev.map(a => a.id === id ? { ...a, status: "rejected" } : a));
-    if (id === "session") {
-      localStorage.removeItem("isVVIPApplied");
-      localStorage.removeItem("vvipApplicant");
-    }
     setSelectedApp(prev => prev?.id === id ? { ...prev, status: "rejected" } : prev);
+    try {
+      await fetch("/api/vvip/reject", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+    } catch { load(); }
+    setActionLoading(null);
   };
 
   const GOLD = "#C9A84C";
@@ -892,13 +891,19 @@ function VVIPApplicationsTab() {
     <div className="flex flex-col gap-5">
       {/* Summary */}
       <div className="grid grid-cols-3 gap-4">
-        <KPICard label="전체 신청" value={String(apps.length)} icon="solar:crown-minimalistic-bold" color={GOLD} />
-        <KPICard label="심사 대기" value={String(pendingCount)} sub="즉시 처리 필요" icon="solar:clock-circle-bold" color={WARN} trend={pendingCount > 0 ? "up" : "flat"} />
-        <KPICard label="승인 완료" value={String(apps.filter(a => a.status === "approved").length)} icon="solar:check-circle-bold" color={SUCCESS} />
+        <KPICard label="전체 신청" value={loading ? "—" : String(apps.length)} icon="solar:crown-minimalistic-bold" color={GOLD} />
+        <KPICard label="심사 대기" value={loading ? "—" : String(pendingCount)} sub="즉시 처리 필요" icon="solar:clock-circle-bold" color={WARN} trend={pendingCount > 0 ? "up" : "flat"} />
+        <KPICard label="승인 완료" value={loading ? "—" : String(apps.filter(a => a.status === "approved").length)} icon="solar:check-circle-bold" color={SUCCESS} />
       </div>
 
       {/* Filters */}
-      <div className="flex gap-2 flex-wrap">
+      <div className="flex gap-2 flex-wrap items-center">
+        <button type="button" onClick={load} disabled={loading}
+          className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium transition-all hover:opacity-80 disabled:opacity-40"
+          style={{ background: `${ACCENT}10`, border: `1px solid ${ACCENT}30`, color: ACCENT }}>
+          <Icon icon="solar:refresh-bold" className="w-3.5 h-3.5" />
+          새로고침
+        </button>
         {(["전체", "pending", "approved", "rejected"] as const).map(s => (
           <button key={s} onClick={() => setFilterStatus(s)}
             className="px-3 py-2 rounded-xl text-xs font-medium transition-all"
@@ -927,19 +932,18 @@ function VVIPApplicationsTab() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map(app => (
+                {loading ? (
+                  <tr><td colSpan={7} className="px-4 py-12 text-center text-white/20">불러오는 중...</td></tr>
+                ) : filtered.map(app => (
                   <tr key={app.id}
                     onClick={() => setSelectedApp(app)}
                     className="border-t cursor-pointer transition-colors hover:bg-white/[0.03]"
                     style={{ borderColor: "rgba(255,255,255,0.04)", background: selectedApp?.id === app.id ? `${GOLD}06` : undefined }}>
-                    <td className="px-4 py-3 font-medium text-white/85 whitespace-nowrap">
-                      {app.isBrowserSession && <span className="mr-1.5 text-[9px] px-1 py-0.5 rounded font-bold" style={{ background: `${ACCENT}20`, color: ACCENT }}>현재세션</span>}
-                      {app.name}
-                    </td>
+                    <td className="px-4 py-3 font-medium text-white/85 whitespace-nowrap">{app.name}</td>
                     <td className="px-4 py-3 text-white/40 max-w-[140px] truncate">{app.email}</td>
                     <td className="px-4 py-3 text-white/50 whitespace-nowrap">{SCALE_LABEL[app.scale] ?? app.scale}</td>
                     <td className="px-4 py-3 text-white/40">{app.referral || "—"}</td>
-                    <td className="px-4 py-3 text-white/30 whitespace-nowrap">{new Date(app.appliedAt).toLocaleDateString("ko-KR")}</td>
+                    <td className="px-4 py-3 text-white/30 whitespace-nowrap">{new Date(app.applied_at).toLocaleDateString("ko-KR")}</td>
                     <td className="px-4 py-3">
                       {app.status === "pending" && <Badge text="심사중" color={WARN} />}
                       {app.status === "approved" && <Badge text="승인" color={SUCCESS} />}
@@ -948,18 +952,18 @@ function VVIPApplicationsTab() {
                     <td className="px-4 py-3">
                       {app.status === "pending" && (
                         <div className="flex gap-1.5">
-                          <button onClick={e => { e.stopPropagation(); approve(app.id); }}
-                            className="px-2 py-1 rounded-lg text-[10px] font-bold transition-all hover:opacity-80 active:scale-95"
+                          <button onClick={e => { e.stopPropagation(); approve(app.id); }} disabled={actionLoading === app.id}
+                            className="px-2 py-1 rounded-lg text-[10px] font-bold transition-all hover:opacity-80 active:scale-95 disabled:opacity-40"
                             style={{ background: `${GOLD}15`, border: `1px solid ${GOLD}40`, color: GOLD }}>승인</button>
-                          <button onClick={e => { e.stopPropagation(); reject(app.id); }}
-                            className="px-2 py-1 rounded-lg text-[10px] font-bold transition-all hover:opacity-80 active:scale-95"
+                          <button onClick={e => { e.stopPropagation(); reject(app.id); }} disabled={actionLoading === app.id}
+                            className="px-2 py-1 rounded-lg text-[10px] font-bold transition-all hover:opacity-80 active:scale-95 disabled:opacity-40"
                             style={{ background: `${DANGER}15`, border: `1px solid ${DANGER}40`, color: DANGER }}>반려</button>
                         </div>
                       )}
                     </td>
                   </tr>
                 ))}
-                {filtered.length === 0 && (
+                {!loading && filtered.length === 0 && (
                   <tr><td colSpan={7} className="px-4 py-12 text-center text-white/20">신청 내역이 없습니다</td></tr>
                 )}
               </tbody>
@@ -990,7 +994,7 @@ function VVIPApplicationsTab() {
             <div className="flex flex-col gap-2 text-xs">
               {[
                 ["추천인", selectedApp.referral || "없음"],
-                ["신청일", new Date(selectedApp.appliedAt).toLocaleString("ko-KR")],
+                ["신청일", new Date(selectedApp.applied_at).toLocaleString("ko-KR")],
               ].map(([k, v]) => (
                 <div key={k} className="flex justify-between gap-2">
                   <span className="text-white/30 flex-shrink-0">{k}</span>

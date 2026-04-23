@@ -837,19 +837,42 @@ function Home() {
   const [formAgreed, setFormAgreed] = useState(false);
 
   const codeInputRef = useRef<HTMLInputElement>(null);
+  const vvipSessionRef = useRef<string>("");
 
-  // 뒤로가기(pageshow) / 탭 복귀(focus) 시에도 재읽기
+  // sessionId 초기화 + Supabase에서 VVIP 상태 로드
   useEffect(() => {
-    const syncStorage = () => {
-      setIsVVIPApplied(localStorage.getItem("isVVIPApplied") === "true");
-      setIsVVIPMember(localStorage.getItem("isVVIPMember") === "true");
+    let sid = localStorage.getItem("loxygene-vvip-sid") ?? "";
+    if (!sid) {
+      sid = crypto.randomUUID();
+      localStorage.setItem("loxygene-vvip-sid", sid);
+    }
+    vvipSessionRef.current = sid;
+
+    const syncStatus = async () => {
+      try {
+        const res = await fetch(`/api/vvip/status?sessionId=${sid}`);
+        if (!res.ok) throw new Error();
+        const data = await res.json();
+        if (data.mock) {
+          // Supabase 미설정: localStorage 폴백
+          setIsVVIPApplied(localStorage.getItem("isVVIPApplied") === "true");
+          setIsVVIPMember(localStorage.getItem("isVVIPMember") === "true");
+        } else {
+          setIsVVIPMember(data.isMember);
+          setIsVVIPApplied(data.status === "pending");
+        }
+      } catch {
+        setIsVVIPApplied(localStorage.getItem("isVVIPApplied") === "true");
+        setIsVVIPMember(localStorage.getItem("isVVIPMember") === "true");
+      }
     };
-    syncStorage();
-    window.addEventListener("pageshow", syncStorage);
-    window.addEventListener("focus", syncStorage);
+
+    syncStatus();
+    window.addEventListener("pageshow", syncStatus);
+    window.addEventListener("focus", syncStatus);
     return () => {
-      window.removeEventListener("pageshow", syncStorage);
-      window.removeEventListener("focus", syncStorage);
+      window.removeEventListener("pageshow", syncStatus);
+      window.removeEventListener("focus", syncStatus);
     };
   }, []);
 
@@ -912,15 +935,26 @@ function Home() {
     }
   };
 
-  const handleSignupSubmit = () => {
-    localStorage.setItem("isVVIPApplied", "true");
-    localStorage.setItem("vvipApplicant", JSON.stringify({
-      name: formName, phone: formPhone, email: formEmail,
-      bio: formBio, referral: formReferral, scale: formScale,
-      appliedAt: new Date().toISOString(),
-    }));
+  const handleSignupSubmit = async () => {
+    const sid = vvipSessionRef.current;
+    // 낙관적 UI 업데이트 (즉시 반응)
     setIsVVIPApplied(true);
     setVvipScreen("success");
+    // localStorage 폴백
+    localStorage.setItem("isVVIPApplied", "true");
+
+    // Supabase에 저장
+    try {
+      await fetch("/api/vvip/apply", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sessionId: sid,
+          name: formName, phone: formPhone, email: formEmail,
+          bio: formBio, referral: formReferral, scale: formScale,
+        }),
+      });
+    } catch { /* 네트워크 오류 시 localStorage만 남음 */ }
   };
 
   const closeVVIP = () => { setVvipScreen("closed"); setPreviewPlaying(false); };

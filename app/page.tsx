@@ -838,9 +838,19 @@ function Home() {
 
   const codeInputRef = useRef<HTMLInputElement>(null);
 
+  // 뒤로가기(pageshow) / 탭 복귀(focus) 시에도 재읽기
   useEffect(() => {
-    setIsVVIPApplied(localStorage.getItem("isVVIPApplied") === "true");
-    setIsVVIPMember(localStorage.getItem("isVVIPMember") === "true");
+    const syncStorage = () => {
+      setIsVVIPApplied(localStorage.getItem("isVVIPApplied") === "true");
+      setIsVVIPMember(localStorage.getItem("isVVIPMember") === "true");
+    };
+    syncStorage();
+    window.addEventListener("pageshow", syncStorage);
+    window.addEventListener("focus", syncStorage);
+    return () => {
+      window.removeEventListener("pageshow", syncStorage);
+      window.removeEventListener("focus", syncStorage);
+    };
   }, []);
 
   // Global ESC handler

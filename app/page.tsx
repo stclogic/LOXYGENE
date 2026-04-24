@@ -17,10 +17,10 @@ import { LoxygeneCarousel } from "@/components/ui/LoxygeneCarousel";
 
 // ── Mock data ─────────────────────────────────────────────────
 const MOCK_ROOMS = [
-  { id: "r1", type: "colosseum", title: "90년대 감성 여행 🎵", host: "별빛가수", viewers: 127, isLive: true, tags: ["#발라드", "#트로트"], href: "/rooms/colosseum" },
+  { id: "r1", type: "colosseum", title: "90년대 감성 여행 🎵", host: "별빛가수", viewers: 127, isLive: true, tags: ["#발라드", "#트로트"], href: "/rooms/colosseum/room-001" },
   { id: "r2", type: "banquet", title: "🎂 축 서른! 김민준의 생일파티", host: "민준이친구들", viewers: 14, isLive: true, tags: ["#생일파티"], href: "/rooms/banquet/ev1" },
   { id: "r3", type: "singertalk", title: "1:1 노래 매칭 중", host: "랜덤매칭", viewers: 2, isLive: true, tags: ["#팝", "#힙합"], href: "/rooms/singertalk" },
-  { id: "r4", type: "colosseum", title: "K-POP 배틀 🎤", host: "가왕도전자", viewers: 89, isLive: false, tags: ["#팝"], href: "/rooms/colosseum" },
+  { id: "r4", type: "colosseum", title: "K-POP 배틀 🎤", host: "가왕도전자", viewers: 89, isLive: false, tags: ["#팝"], href: "/rooms/colosseum/room-001" },
   { id: "r5", type: "banquet", title: "🏢 넥스트레벨 창립 3주년", host: "NEXTLEVEL", viewers: 35, isLive: false, tags: ["#기업행사"], href: "/rooms/banquet/ev4" },
 ];
 
@@ -1204,8 +1204,8 @@ function Home() {
                 <p className="text-xs font-light text-white/50 mt-1">{t.cards.roomKing.desc}</p>
               </div>
               <div className="z-10 mt-auto pt-4 flex gap-2 w-full">
-                <Link href="/rooms/colosseum" className="flex-1 py-2.5 rounded bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/20 text-xs font-medium text-white/80 transition-all text-center">{t.cards.roomKing.create}</Link>
-                <Link href="/rooms/colosseum" className="flex-1 py-2.5 rounded bg-[#00E5FF]/10 hover:bg-[#00E5FF]/20 border border-[#00E5FF]/30 hover:border-[#00E5FF] text-xs font-medium text-[#00E5FF] hover:shadow-[0_0_10px_rgba(0,229,255,0.3)] transition-all text-center">{t.cards.roomKing.join}</Link>
+                <Link href="/rooms/colosseum/room-001" className="flex-1 py-2.5 rounded bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/20 text-xs font-medium text-white/80 transition-all text-center">{t.cards.roomKing.create}</Link>
+                <Link href="/rooms/colosseum/room-001" className="flex-1 py-2.5 rounded bg-[#00E5FF]/10 hover:bg-[#00E5FF]/20 border border-[#00E5FF]/30 hover:border-[#00E5FF] text-xs font-medium text-[#00E5FF] hover:shadow-[0_0_10px_rgba(0,229,255,0.3)] transition-all text-center">{t.cards.roomKing.join}</Link>
               </div>
             </div>
 

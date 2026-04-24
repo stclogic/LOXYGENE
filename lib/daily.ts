@@ -28,7 +28,7 @@ export async function ensureBroadcastRoom(roomName: string) {
         enable_chat: false,
         enable_screenshare: false,
         enable_recording: false,
-        exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 365, // 1년 유지
+        eject_at_room_exp: false, // 방 만료 시 자동 퇴장 방지 → 미팅 유지
       },
     }),
   });

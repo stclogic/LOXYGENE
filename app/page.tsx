@@ -821,6 +821,18 @@ function Home() {
   const [scanDone, setScanDone] = useState(false);
   const [isVVIPApplied, setIsVVIPApplied] = useState(false);
   const [isVVIPMember, setIsVVIPMember] = useState(false);
+
+  // Fullscreen
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  useEffect(() => {
+    const onChange = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener("fullscreenchange", onChange);
+    return () => document.removeEventListener("fullscreenchange", onChange);
+  }, []);
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(() => {});
+    else document.exitFullscreen().catch(() => {});
+  };
   const [codeInputFocused, setCodeInputFocused] = useState(false);
   const [codeError, setCodeError] = useState("");
   const [vvipScreen, setVvipScreen] = useState<VVIPScreen>("closed");
@@ -1013,6 +1025,17 @@ function Home() {
 
         {/* Right side */}
         <div className="flex items-center gap-2 ml-auto">
+          {/* Fullscreen toggle */}
+          <button
+            type="button"
+            onClick={toggleFullscreen}
+            title={isFullscreen ? "전체화면 종료 (ESC)" : "전체화면"}
+            className="flex items-center justify-center w-10 h-10 rounded-xl transition-all hover:border-white/20"
+            style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}
+            aria-label={isFullscreen ? "전체화면 종료" : "전체화면"}>
+            <Icon icon={isFullscreen ? "solar:quit-full-screen-bold" : "solar:full-screen-bold"} className="w-4 h-4 text-white/50" />
+          </button>
+
           {/* Search — always visible */}
           <button
             onClick={() => setSearchOpen(true)}

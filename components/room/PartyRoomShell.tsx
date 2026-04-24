@@ -21,6 +21,11 @@ const BG_OPTIONS = [
   { id: "beach",      label: "🏖️ 비치파티",  from: "#f7971e", via: "#ffd200", to: "#f7971e" },
   { id: "fireworks",  label: "🎆 불꽃놀이",  from: "#360033", via: "#0b8793", to: "#360033" },
   { id: "space",      label: "🌌 우주파티",  from: "#0f0c29", via: "#302b63", to: "#000000" },
+  {
+    id: "black_lounge", label: "🖤 Black 라운지",
+    from: "#000000", via: "#0d0d0d", to: "#000000",
+    image: "https://blogger.googleusercontent.com/img/a/AVvXsEiQuYLBKnbhsfWfONeyBPq4xnh02OOcEavNN0hurvGSQwn7m75JxI_bxJaETkqS4yXTYdHvCl1RzFq6_ZQJNNxhjoxphFwJPaBQG6GgzrPjU1GPBWGJegufsgDzJs-Xl4oY6JBUge0qK592ZzlB-PHQy-8Sw36PdJ6yTjlIO4-d9KptJfhTkB9ysYFwsfk",
+  },
 ];
 
 const IS_FREE = false; // mock — derive from session in production
@@ -621,7 +626,10 @@ export function PartyRoomShell({
         {/* Gradient always fills the backdrop */}
         <div
           className="absolute inset-0"
-          style={{ background: `linear-gradient(135deg, ${selectedBg.from}, ${selectedBg.via}, ${selectedBg.to})` }}
+          style={"image" in selectedBg && selectedBg.image
+            ? { backgroundImage: `url('${selectedBg.image}')`, backgroundSize: "cover", backgroundPosition: "center", backgroundColor: "rgba(2,2,2,0.8)", backgroundBlendMode: "luminosity" }
+            : { background: `linear-gradient(135deg, ${selectedBg.from}, ${selectedBg.via}, ${selectedBg.to})` }
+          }
         />
 
         {/* Stage silhouette — always visible as backdrop */}
@@ -1085,11 +1093,22 @@ export function PartyRoomShell({
                   key={bg.id}
                   onClick={() => { setSelectedBg(bg); setBgPickerOpen(false); }}
                   className="relative h-20 rounded-xl overflow-hidden transition-all flex items-end p-2"
-                  style={{
-                    background: `linear-gradient(135deg, ${bg.from}, ${bg.via}, ${bg.to})`,
-                    outline: selectedBg.id === bg.id ? "2px solid #00E5FF" : "none",
-                    outlineOffset: 2,
-                  }}
+                  style={"image" in bg && bg.image
+                    ? {
+                        backgroundImage: `url('${bg.image}')`,
+                        backgroundSize: "cover",
+                        backgroundPosition: "center",
+                        backgroundColor: "rgba(2,2,2,0.7)",
+                        backgroundBlendMode: "luminosity",
+                        outline: selectedBg.id === bg.id ? "2px solid #C9A84C" : "none",
+                        outlineOffset: 2,
+                      }
+                    : {
+                        background: `linear-gradient(135deg, ${bg.from}, ${bg.via}, ${bg.to})`,
+                        outline: selectedBg.id === bg.id ? "2px solid #00E5FF" : "none",
+                        outlineOffset: 2,
+                      }
+                  }
                 >
                   <span className="relative z-10 text-[10px] font-semibold text-white drop-shadow-lg">{bg.label}</span>
                 </button>

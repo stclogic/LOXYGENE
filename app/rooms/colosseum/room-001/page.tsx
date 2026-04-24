@@ -113,7 +113,7 @@ const nickColor = (nick: string) => {
 // ── Component ──────────────────────────────────────────────────────────────────
 export default function ColosseumRoom001Page() {
   // Role
-  const [isHost, setIsHost] = useState(true);
+  const [isHost, setIsHost] = useState(false); // API 응답 전까지 게스트로 시작
 
   // ── Daily.co 단방향 방송 ───────────────────────────────────────────────────
   const [broadcastRoomUrl, setBroadcastRoomUrl] = useState("");
@@ -284,7 +284,7 @@ export default function ColosseumRoom001Page() {
         if (data.token)   setBroadcastToken(data.token);
         if (data.role) {
           setBroadcastRole(data.role);
-          if (data.role === "host") setIsHost(true);
+          setIsHost(data.role === "host"); // host/guest 모두 명시적 설정
         }
       })
       .catch(console.error);

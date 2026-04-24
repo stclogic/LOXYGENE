@@ -29,6 +29,7 @@ import { useBPMDetector } from "@/lib/audio/useBPMDetector";
 import { useVoiceScoring } from "@/lib/scoring/useVoiceScoring";
 import { hasNickname, getUserNickname, setUserNickname, randomNickname } from "@/lib/utils/userSession";
 import { envConfig } from "@/lib/utils/envCheck";
+import { useDailyBroadcast } from "@/hooks/useDailyBroadcast";
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 const SONG_TITLE = "안동역에서";
@@ -113,6 +114,20 @@ const nickColor = (nick: string) => {
 export default function ColosseumRoom001Page() {
   // Role
   const [isHost, setIsHost] = useState(true);
+
+  // ── Daily.co 단방향 방송 ───────────────────────────────────────────────────
+  const [broadcastRoomUrl, setBroadcastRoomUrl] = useState("");
+  const [broadcastToken, setBroadcastToken]   = useState<string | null>(null);
+  const [broadcastRole, setBroadcastRole]     = useState<"host" | "guest">("guest");
+  const [nicknameForBroadcast, setNicknameForBroadcast] = useState("게스트");
+
+  const { joined, localAudioOn, localVideoOn, toggleMic, toggleCamera, guestCount } =
+    useDailyBroadcast({
+      roomUrl:  broadcastRoomUrl,
+      token:    broadcastToken,
+      isHost:   broadcastRole === "host",
+      nickname: nicknameForBroadcast,
+    });
 
   // Broadcast countdown (2 hours = 7200s) — starts on mount
   const [secondsLeft, setSecondsLeft] = useState(2 * 60 * 60);
@@ -248,8 +263,32 @@ export default function ColosseumRoom001Page() {
     const name = nicknameInput.trim();
     if (!name) return;
     setUserNickname(name);
+    setNicknameForBroadcast(name);
     setNicknameModalOpen(false);
   };
+
+  // ── broadcast-join: 고정 세션 THE COLOSSEUM 입장 ────────────────────────
+  useEffect(() => {
+    const nickname = getUserNickname();
+    if (nickname) setNicknameForBroadcast(nickname);
+
+    fetch("/api/rooms/colosseum/broadcast-join", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ nickname: nickname || "게스트" }),
+    })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (!data) return;
+        if (data.roomUrl) setBroadcastRoomUrl(data.roomUrl);
+        if (data.token)   setBroadcastToken(data.token);
+        if (data.role) {
+          setBroadcastRole(data.role);
+          if (data.role === "host") setIsHost(true);
+        }
+      })
+      .catch(console.error);
+  }, []);
 
   const gifts = useRoomStore((s) => s.gifts);
 
@@ -624,10 +663,38 @@ export default function ColosseumRoom001Page() {
           >
             {isHost ? "👑 호스트" : "참여자"}
           </button>
+          {/* 실시간 시청자 수 (Daily 연결 시 실제값, 미연결 시 mock) */}
           <div className="flex items-center gap-1.5">
             <Icon icon="solar:user-bold" className="text-white/40 w-4 h-4" />
-            <span className="text-white/60 text-sm">127</span>
+            <span className="text-white/60 text-sm">{joined ? guestCount : 127}</span>
           </div>
+
+          {/* 호스트 마이크 토글 (Daily 연결 후 표시) */}
+          {isHost && joined && (
+            <button
+              type="button"
+              title={localAudioOn ? "마이크 끄기" : "마이크 켜기 (방송 시작)"}
+              onClick={toggleMic}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition-all hover:opacity-80 active:scale-95"
+              style={{
+                background: localAudioOn ? "rgba(0,229,255,0.15)" : "rgba(255,255,255,0.06)",
+                border: `1px solid ${localAudioOn ? "rgba(0,229,255,0.5)" : "rgba(255,255,255,0.12)"}`,
+                color: localAudioOn ? "#00E5FF" : "rgba(255,255,255,0.4)",
+              }}
+            >
+              <Icon icon={localAudioOn ? "solar:microphone-bold" : "solar:microphone-slash-bold"} className="w-3.5 h-3.5" />
+              {localAudioOn ? "ON AIR" : "오프"}
+            </button>
+          )}
+
+          {/* Daily 연결 상태 인디케이터 */}
+          {joined && (
+            <div className="flex items-center gap-1 px-2 py-1 rounded-full"
+              style={{ background: "rgba(0,229,255,0.08)", border: "1px solid rgba(0,229,255,0.2)" }}>
+              <span className="w-1.5 h-1.5 rounded-full bg-[#00E5FF] animate-pulse block" />
+              <span className="text-[9px] text-[#00E5FF] font-semibold tracking-wider">연결됨</span>
+            </div>
+          )}
           <button
             type="button"
             title={isFullscreen ? "전체화면 종료 (ESC)" : "전체화면"}

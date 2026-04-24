@@ -68,7 +68,13 @@ export default function BlackLobbyPage() {
 
   return (
     <div className="min-h-screen flex flex-col overflow-hidden"
-      style={{ background: "#020202" }}>
+      style={{
+        backgroundImage: "url('https://blogger.googleusercontent.com/img/a/AVvXsEiQuYLBKnbhsfWfONeyBPq4xnh02OOcEavNN0hurvGSQwn7m75JxI_bxJaETkqS4yXTYdHvCl1RzFq6_ZQJNNxhjoxphFwJPaBQG6GgzrPjU1GPBWGJegufsgDzJs-Xl4oY6JBUge0qK592ZzlB-PHQy-8Sw36PdJ6yTjlIO4-d9KptJfhTkB9ysYFwsfk')",
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+        backgroundColor: "rgba(2,2,2,0.88)",
+        backgroundBlendMode: "luminosity",
+      }}>
 
       {/* Gold dust particles */}
       <GoldDust />

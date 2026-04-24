@@ -255,8 +255,20 @@ export default function BlackRoomPage({ params }: { params: { roomId: string } }
     setNicknameModalOpen(false);
   };
 
+  const BG_IMAGE = "https://blogger.googleusercontent.com/img/a/AVvXsEiQuYLBKnbhsfWfONeyBPq4xnh02OOcEavNN0hurvGSQwn7m75JxI_bxJaETkqS4yXTYdHvCl1RzFq6_ZQJNNxhjoxphFwJPaBQG6GgzrPjU1GPBWGJegufsgDzJs-Xl4oY6JBUge0qK592ZzlB-PHQy-8Sw36PdJ6yTjlIO4-d9KptJfhTkB9ysYFwsfk";
+
   return (
     <>
+      {/* Black room 배경 이미지 */}
+      <div className="fixed inset-0 z-0 pointer-events-none"
+        style={{
+          backgroundImage: `url('${BG_IMAGE}')`,
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          backgroundColor: "rgba(2,2,2,0.82)",
+          backgroundBlendMode: "luminosity",
+        }}
+      />
       <PartyRoomShell
         roomName="L'OXYGÈNE BLACK"
         roomSubtitle={`룸 ${params.roomId}`}

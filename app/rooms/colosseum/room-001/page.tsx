@@ -183,7 +183,17 @@ export default function ColosseumRoom001Page() {
   const [lastGiftType, setLastGiftType] = useState<"bouquet" | "champagne" | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // ── 메인 무대 영상 (기본 정지) ──────────────────────────────────────────────
+  // ── 전체화면 ──────────────────────────────────────────────────────────────
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  useEffect(() => {
+    const onChange = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener("fullscreenchange", onChange);
+    return () => document.removeEventListener("fullscreenchange", onChange);
+  }, []);
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(() => {});
+    else document.exitFullscreen().catch(() => {});
+  };
 
   // ── 메인 무대 영상 (기본 정지) ──────────────────────────────────────────────
   const MAIN_VIDEO_ID = "joCz5tmXAcI";
@@ -583,6 +593,18 @@ export default function ColosseumRoom001Page() {
             <Icon icon="solar:user-bold" className="text-white/40 w-4 h-4" />
             <span className="text-white/60 text-sm">127</span>
           </div>
+          <button
+            type="button"
+            title={isFullscreen ? "전체화면 종료 (ESC)" : "전체화면"}
+            onClick={toggleFullscreen}
+            className="flex items-center justify-center w-7 h-7 rounded-lg transition-all hover:opacity-80 active:scale-95"
+            style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)" }}
+          >
+            <Icon
+              icon={isFullscreen ? "solar:quit-full-screen-bold" : "solar:full-screen-bold"}
+              className="w-3.5 h-3.5 text-white/50"
+            />
+          </button>
         </div>
       </div>
 

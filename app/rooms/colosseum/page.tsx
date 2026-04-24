@@ -102,17 +102,70 @@ interface CreateRoomForm {
 export default function ColosseumLobbyPage() {
   const router = useRouter();
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [rooms] = useState(MOCK_ROOMS);
+  const [form, setForm] = useState<CreateRoomForm>({
+    title: "",
+    tags: "",
+    maxParticipants: 10,
+    hasPassword: false,
+    password: "",
+  });
+  const [rooms, setRooms] = useState(MOCK_ROOMS);
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState("");
 
-  // THE COLOSSEUM은 고정 방송 방(room-001) 하나만 운영
-  // DB에서 추가 방을 불러오지 않고 항상 room-001로 고정
-  const refreshRooms = () => { /* room-001 고정 운영 */ };
+  const refreshRooms = () => {
+    fetch("/api/rooms/list?type=colosseum")
+      .then((r) => r.json())
+      .then((data) => {
+        if (!Array.isArray(data.rooms)) return;
+        if (data.rooms.length === 0) { setRooms([]); return; }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const normalized = data.rooms.map((r: any) => ({
+          id: r.id,
+          title: r.title ?? "무제",
+          hostName: r.host?.nickname ?? r.host_id?.slice(0, 8) ?? "호스트",
+          hostAvatar: r.host?.avatar_url ?? "🎤",
+          participantCount: r.participants?.[0]?.count ?? 0,
+          viewerCount: r.participants?.[0]?.count ?? 0,
+          topGiftAmount: 0,
+          tags: r.tags ?? [],
+          vibe: "🎉 파티",
+          isLive: r.status === "live",
+        }));
+        setRooms(normalized);
+      })
+      .catch(() => {});
+  };
 
   useEffect(() => { refreshRooms(); }, []);
 
-  // 방 만들기 → 항상 room-001 입장
-  const handleCreateRoom = () => {
-    router.push("/rooms/colosseum/room-001");
+  const handleCreateRoom = async () => {
+    if (!form.title.trim()) return;
+    setCreating(true);
+    setCreateError("");
+    try {
+      const res = await fetch("/api/rooms/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: form.title,
+          type: "colosseum",
+          maxParticipants: form.maxParticipants,
+          isPrivate: form.hasPassword,
+          password: form.hasPassword ? form.password : undefined,
+        }),
+      });
+      const data = await res.json();
+      if (data.roomId) {
+        router.push(`/rooms/colosseum/${data.roomId}`);
+      } else {
+        setCreateError(data.error ?? "방 만들기 실패");
+      }
+    } catch {
+      setCreateError("네트워크 오류가 발생했습니다.");
+    } finally {
+      setCreating(false);
+    }
   };
 
   const totalUsers = rooms.reduce((sum, r) => sum + (r.participantCount ?? 0), 0);
@@ -263,10 +316,10 @@ export default function ColosseumLobbyPage() {
 
               {/* Action buttons */}
               <div className="flex gap-2 mt-auto pt-1">
-                <Link href="/rooms/colosseum/room-001" className="flex-1">
+                <Link href={room.id === "room-001" ? "/rooms/colosseum/room-001" : `/rooms/colosseum/${room.id}`} className="flex-1">
                   <NeonButton variant="cyan" size="sm" fullWidth>파티 입장</NeonButton>
                 </Link>
-                <Link href="/rooms/colosseum/room-001" className="flex-1">
+                <Link href={room.id === "room-001" ? "/rooms/colosseum/room-001" : `/rooms/colosseum/${room.id}?spectate=true`} className="flex-1">
                   <NeonButton variant="ghost" size="sm" fullWidth>관전</NeonButton>
                 </Link>
               </div>
@@ -292,31 +345,66 @@ export default function ColosseumLobbyPage() {
       {showCreateModal && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ background: "rgba(0,0,0,0.85)", backdropFilter: "blur(12px)" }}
+          style={{ background: "rgba(0,0,0,0.8)", backdropFilter: "blur(8px)" }}
           onClick={(e) => e.target === e.currentTarget && setShowCreateModal(false)}
         >
-          <GlassCard className="w-full max-w-sm p-7 flex flex-col items-center gap-5 text-center">
-            <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-3xl"
-              style={{ background: "rgba(0,229,255,0.1)", border: "1px solid rgba(0,229,255,0.3)" }}>
-              🎙️
-            </div>
-            <div>
-              <h2 className="text-white font-black text-lg">THE COLOSSEUM</h2>
-              <p className="text-white/40 text-sm mt-1.5">현재 단일 방송 방으로 운영 중입니다.<br />지금 바로 입장하시겠어요?</p>
-            </div>
-            <div className="flex gap-3 w-full">
-              <button
-                type="button"
-                onClick={() => setShowCreateModal(false)}
-                className="flex-1 py-2.5 rounded-xl text-sm font-medium transition-all"
-                style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.5)" }}
-              >
-                취소
+          <GlassCard className="w-full max-w-md p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-white font-bold text-xl">방 만들기</h2>
+              <button type="button" title="닫기" onClick={() => setShowCreateModal(false)} className="text-white/40 hover:text-white/70 transition-colors">
+                <Icon icon="solar:close-circle-bold" className="w-6 h-6" />
               </button>
-              <NeonButton variant="cyan" size="sm" fullWidth onClick={handleCreateRoom}>
+            </div>
+            <div className="space-y-5">
+              <div>
+                <label className="block text-white/60 text-sm mb-2 font-medium">방 제목</label>
+                <input type="text" placeholder="예: 오늘 밤 발라드 파티 🎵"
+                  value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })}
+                  className="w-full px-4 py-3 rounded-xl text-white text-sm outline-none transition-all duration-200 placeholder:text-white/20"
+                  style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}
+                  onFocus={(e) => { e.target.style.border = "1px solid rgba(0,229,255,0.4)"; e.target.style.boxShadow = "0 0 10px rgba(0,229,255,0.1)"; }}
+                  onBlur={(e) => { e.target.style.border = "1px solid rgba(255,255,255,0.08)"; e.target.style.boxShadow = "none"; }}
+                />
+              </div>
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-white/60 text-sm font-medium">최대 참여자 수</label>
+                  <span className="text-[#00E5FF] font-bold text-sm">{form.maxParticipants}명</span>
+                </div>
+                <input type="range" min={2} max={50} value={form.maxParticipants}
+                  title="최대 참여자 수"
+                  onChange={(e) => setForm({ ...form, maxParticipants: Number(e.target.value) })}
+                  className="w-full" style={{ accentColor: "#00E5FF" }} />
+              </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-white/60 text-sm font-medium">비밀번호 설정</p>
+                  <p className="text-white/30 text-xs mt-0.5">비공개 방으로 만들기</p>
+                </div>
+                <button type="button" title="비밀번호 토글"
+                  onClick={() => setForm({ ...form, hasPassword: !form.hasPassword })}
+                  className="relative w-12 h-6 rounded-full transition-all duration-300 flex-shrink-0"
+                  style={{ background: form.hasPassword ? "rgba(0,229,255,0.6)" : "rgba(255,255,255,0.1)" }}>
+                  <div className="absolute top-1 w-4 h-4 rounded-full bg-white transition-all duration-300"
+                    style={{ left: form.hasPassword ? "calc(100% - 20px)" : "4px" }} />
+                </button>
+              </div>
+              {form.hasPassword && (
+                <input type="password" placeholder="비밀번호 입력"
+                  value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })}
+                  className="w-full px-4 py-3 rounded-xl text-white text-sm outline-none placeholder:text-white/20"
+                  style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }} />
+              )}
+              {createError && (
+                <p className="text-xs rounded-lg px-3 py-2"
+                  style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)", color: "#f87171" }}>
+                  {createError}
+                </p>
+              )}
+              <NeonButton variant="pink" size="lg" fullWidth onClick={handleCreateRoom} disabled={creating}>
                 <div className="flex items-center justify-center gap-2">
-                  <Icon icon="solar:arrow-right-bold" className="w-4 h-4" />
-                  입장하기
+                  <Icon icon="solar:add-circle-bold" className="w-5 h-5" />
+                  {creating ? "생성 중..." : "방 개설하기"}
                 </div>
               </NeonButton>
             </div>

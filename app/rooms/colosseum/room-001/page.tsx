@@ -205,6 +205,30 @@ export default function ColosseumRoom001Page() {
   const [karaokeUrlInput, setKaraokeUrlInput] = useState("");
   const [karaokeInputOpen, setKaraokeInputOpen] = useState(false);
   const [karaokeUrlError, setKaraokeUrlError] = useState(false);
+  const [karaokePopPos, setKaraokePopPos] = useState({ x: 144, y: 96 });
+  const karaokeDragging = useRef(false);
+  const karaokeDragOrigin = useRef({ mx: 0, my: 0, px: 0, py: 0 });
+
+  const startKaraokeDrag = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    karaokeDragging.current = true;
+    karaokeDragOrigin.current = { mx: e.clientX, my: e.clientY, px: karaokePopPos.x, py: karaokePopPos.y };
+    const onMove = (ev: MouseEvent) => {
+      if (!karaokeDragging.current) return;
+      setKaraokePopPos({
+        x: Math.max(0, Math.min(window.innerWidth - 288, karaokeDragOrigin.current.px + ev.clientX - karaokeDragOrigin.current.mx)),
+        y: Math.max(0, Math.min(window.innerHeight - 100, karaokeDragOrigin.current.py + ev.clientY - karaokeDragOrigin.current.my)),
+      });
+    };
+    const onUp = () => {
+      karaokeDragging.current = false;
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  };
 
   // Director
   const [directorOpen, setDirectorOpen] = useState(false);
@@ -490,10 +514,20 @@ export default function ColosseumRoom001Page() {
         </button>
       )}
 
-      {/* 노래방 URL 입력 팝오버 */}
+      {/* 노래방 URL 입력 팝오버 (드래그 가능) */}
       {isHost && karaokeInputOpen && (
-        <div className="fixed top-24 left-36 z-50 w-72 rounded-xl p-4 flex flex-col gap-3"
-          style={{ background: "rgba(8,8,20,0.97)", border: "1px solid rgba(236,72,153,0.3)", backdropFilter: "blur(20px)", boxShadow: "0 8px 32px rgba(0,0,0,0.6)" }}>
+        <div className="fixed z-50 w-72 rounded-xl flex flex-col overflow-hidden"
+          style={{ left: karaokePopPos.x, top: karaokePopPos.y, background: "rgba(8,8,20,0.97)", border: "1px solid rgba(236,72,153,0.3)", backdropFilter: "blur(20px)", boxShadow: "0 8px 32px rgba(0,0,0,0.6)" }}>
+          {/* 드래그 핸들 */}
+          <div
+            onMouseDown={startKaraokeDrag}
+            className="flex items-center justify-between px-4 py-2.5 cursor-grab active:cursor-grabbing select-none"
+            style={{ background: "rgba(236,72,153,0.1)", borderBottom: "1px solid rgba(236,72,153,0.15)" }}
+          >
+            <span className="text-[10px] font-bold tracking-widest text-pink-400">🎤 노래방</span>
+            <Icon icon="solar:menu-dots-bold" className="w-3.5 h-3.5 text-white/30" />
+          </div>
+          <div className="p-4 flex flex-col gap-3">
           <p className="text-[11px] text-white/50 font-medium tracking-widest">YouTube URL 입력</p>
           <div className="flex gap-2">
             <input
@@ -539,6 +573,7 @@ export default function ColosseumRoom001Page() {
               style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)", lineHeight: 1.7 }}
               onChange={e => setKaraokeLyrics(e.target.value.split("\n").filter(l => l.trim()))}
             />
+          </div>
           </div>
         </div>
       )}

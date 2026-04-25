@@ -32,6 +32,7 @@ import { hasNickname, getUserNickname, setUserNickname, randomNickname } from "@
 import { envConfig } from "@/lib/utils/envCheck";
 import { useDailyBroadcast } from "@/hooks/useDailyBroadcast";
 import { useRealtimeChat } from "@/lib/supabase/useRealtimeChat";
+import { supabase, isSupabaseConfigured } from "@/lib/supabase/supabaseClient";
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 const SONG_TITLE = "안동역에서";
@@ -126,14 +127,67 @@ export default function ColosseumRoom001Page() {
   const [nicknameForBroadcast, setNicknameForBroadcast] = useState("게스트");
   const [broadcastReady, setBroadcastReady]   = useState(false); // API 완료 후 true
 
-  const { joined, localAudioOn, localVideoOn, toggleMic, toggleCamera, guestCount, error: dailyError, status: dailyStatus } =
-    useDailyBroadcast({
-      roomUrl:  broadcastRoomUrl,
-      token:    broadcastToken,
-      isHost:   broadcastRole === "host",
-      nickname: nicknameForBroadcast,
-      ready:    broadcastReady,
-    });
+  // ── 콘텐츠 동기화 채널 (Supabase Broadcast) ───────────────────────────────
+  // 호스트가 재생하는 영상/카라오케를 게스트에게 실시간 전송
+  const contentChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+    const ch = supabase.channel("broadcast:content:room-001")
+      .on("broadcast", { event: "content" }, ({ payload }) => {
+        // 게스트: 호스트 상태를 받아 동기화
+        if (payload.mainVideoPlaying !== undefined) setMainVideoPlaying(payload.mainVideoPlaying);
+        if (payload.karaokeVideoId   !== undefined) setKaraokeVideoId(payload.karaokeVideoId);
+        if (payload.karaokeLyrics    !== undefined) setKaraokeLyrics(payload.karaokeLyrics);
+      })
+      .subscribe();
+    contentChannelRef.current = ch;
+    return () => { supabase.removeChannel(ch); };
+  }, []);
+
+  // 호스트가 상태 변경할 때마다 브로드캐스트
+  const broadcastContent = useCallback((patch: Record<string, unknown>) => {
+    if (!isHost || !isSupabaseConfigured) return;
+    contentChannelRef.current?.send({ type: "broadcast", event: "content", payload: patch });
+  }, [isHost]);
+
+  const {
+    joined, localAudioOn, localVideoOn,
+    toggleMic, toggleCamera,
+    guestCount,
+    hostVideoTrack, hostAudioTrack,
+    error: dailyError, status: dailyStatus,
+  } = useDailyBroadcast({
+    roomUrl:  broadcastRoomUrl,
+    token:    broadcastToken,
+    isHost:   broadcastRole === "host",
+    nickname: nicknameForBroadcast,
+    ready:    broadcastReady,
+  });
+
+  // 게스트: 호스트 Daily 비디오 트랙을 <video>에 연결
+  const remoteVideoRef = useRef<HTMLVideoElement>(null);
+  useEffect(() => {
+    if (!remoteVideoRef.current) return;
+    if (hostVideoTrack) {
+      remoteVideoRef.current.srcObject = new MediaStream([hostVideoTrack]);
+      remoteVideoRef.current.play().catch(() => {});
+    } else {
+      remoteVideoRef.current.srcObject = null;
+    }
+  }, [hostVideoTrack]);
+
+  // 게스트: 호스트 오디오 트랙 연결 (Daily SDK가 자동 처리하지 않을 경우 대비)
+  const remoteAudioRef = useRef<HTMLAudioElement>(null);
+  useEffect(() => {
+    if (!remoteAudioRef.current) return;
+    if (hostAudioTrack) {
+      remoteAudioRef.current.srcObject = new MediaStream([hostAudioTrack]);
+      remoteAudioRef.current.play().catch(() => {});
+    } else {
+      remoteAudioRef.current.srcObject = null;
+    }
+  }, [hostAudioTrack]);
 
   // Broadcast countdown (2 hours = 7200s) — starts on mount
   const [secondsLeft, setSecondsLeft] = useState(2 * 60 * 60);
@@ -642,7 +696,7 @@ export default function ColosseumRoom001Page() {
               onKeyDown={e => {
                 if (e.key === "Enter") {
                   const id = extractYouTubeId(karaokeUrlInput.trim());
-                  if (id) { setKaraokeVideoId(id); setKaraokeInputOpen(false); setKaraokeUrlError(false); }
+                  if (id) { setKaraokeVideoId(id); setKaraokeInputOpen(false); setKaraokeUrlError(false); broadcastContent({ karaokeVideoId: id }); }
                   else setKaraokeUrlError(true);
                 }
               }}
@@ -654,7 +708,7 @@ export default function ColosseumRoom001Page() {
               type="button"
               onClick={() => {
                 const id = extractYouTubeId(karaokeUrlInput.trim());
-                if (id) { setKaraokeVideoId(id); setKaraokeInputOpen(false); setKaraokeUrlError(false); }
+                if (id) { setKaraokeVideoId(id); setKaraokeInputOpen(false); setKaraokeUrlError(false); broadcastContent({ karaokeVideoId: id }); }
                 else setKaraokeUrlError(true);
               }}
               className="flex-shrink-0 px-3 py-2 rounded-lg text-xs font-bold"
@@ -665,7 +719,7 @@ export default function ColosseumRoom001Page() {
           {karaokeVideoId && (
             <button
               type="button"
-              onClick={() => { setKaraokeVideoId(null); setKaraokeUrlInput(""); setKaraokeInputOpen(false); }}
+              onClick={() => { setKaraokeVideoId(null); setKaraokeUrlInput(""); setKaraokeInputOpen(false); broadcastContent({ karaokeVideoId: null }); }}
               className="text-[11px] py-1.5 rounded-lg"
               style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.25)", color: "rgba(239,68,68,0.8)" }}
             >🔴 영상 중지</button>
@@ -677,7 +731,11 @@ export default function ColosseumRoom001Page() {
               rows={4}
               className="w-full px-3 py-2 rounded-lg text-xs text-white outline-none placeholder-white/20 resize-none"
               style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)", lineHeight: 1.7 }}
-              onChange={e => setKaraokeLyrics(e.target.value.split("\n").filter(l => l.trim()))}
+              onChange={e => {
+                const lines = e.target.value.split("\n").filter(l => l.trim());
+                setKaraokeLyrics(lines);
+                broadcastContent({ karaokeLyrics: lines });
+              }}
             />
           </div>
           </div>
@@ -1240,17 +1298,12 @@ export default function ColosseumRoom001Page() {
         </div>
       )}
 
-      {/* ── 호스트 비디오 플로팅 패널 ── */}
+      {/* ── 호스트 자기 화면 (로컬 카메라 미리보기) ── */}
       {isHost && (
-        <FloatingPanel defaultW={520} aspectRatio={16 / 9} zIndex={55}>
+        <FloatingPanel defaultW={280} aspectRatio={16 / 9} zIndex={55}>
           {hostStream ? (
-            <video
-              ref={hostVideoRef}
-              autoPlay
-              muted
-              playsInline
-              className="absolute inset-0 w-full h-full object-cover"
-            />
+            <video ref={hostVideoRef} autoPlay muted playsInline
+              className="absolute inset-0 w-full h-full object-cover" />
           ) : (
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-2"
               style={{ background: "rgba(8,8,20,0.9)", backdropFilter: "blur(8px)" }}>
@@ -1260,6 +1313,26 @@ export default function ColosseumRoom001Page() {
           )}
         </FloatingPanel>
       )}
+
+      {/* ── 게스트 화면: 호스트 Daily 비디오 (실시간 방송) ── */}
+      {!isHost && joined && (
+        <FloatingPanel defaultW={680} aspectRatio={16 / 9} zIndex={55}>
+          {hostVideoTrack ? (
+            <video ref={remoteVideoRef} autoPlay playsInline
+              className="absolute inset-0 w-full h-full object-cover" />
+          ) : (
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-2"
+              style={{ background: "rgba(8,8,20,0.95)" }}>
+              <span className="text-3xl animate-pulse">📡</span>
+              <span className="text-white/40 text-xs">호스트 연결 대기 중...</span>
+            </div>
+          )}
+        </FloatingPanel>
+      )}
+
+      {/* 호스트 오디오 (Daily SDK 자동처리 보조) */}
+      {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+      <audio ref={remoteAudioRef} autoPlay playsInline style={{ display: "none" }} />
 
       {/* ── BGM (YouTubeBackgroundPlayer — 버튼 + 이퀄라이저 포함) ── */}
       {/* 버튼은 헤더 우측에 렌더링, 여기선 플레이어만 마운트 */}
@@ -1281,7 +1354,7 @@ export default function ColosseumRoom001Page() {
             <div className="absolute inset-0" style={{ background: "rgba(0,0,0,0.45)" }} />
             <button
               type="button"
-              onClick={() => setMainVideoPlaying(true)}
+              onClick={() => { setMainVideoPlaying(true); broadcastContent({ mainVideoPlaying: true }); }}
               className="relative z-10 w-20 h-20 rounded-full flex items-center justify-center transition-all hover:scale-110 active:scale-95"
               title="재생"
               style={{ background: "rgba(255,255,255,0.18)", border: "2px solid rgba(255,255,255,0.7)", backdropFilter: "blur(6px)" }}

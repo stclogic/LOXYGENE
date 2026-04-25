@@ -18,7 +18,7 @@ interface UseDailyBroadcastOptions {
   token: string | null;
   isHost: boolean;
   nickname: string;
-  ready: boolean; // API 응답 완료 후 true — 이전에는 join 시도 안 함
+  ready: boolean;
 }
 
 interface UseDailyBroadcastReturn {
@@ -29,6 +29,9 @@ interface UseDailyBroadcastReturn {
   toggleCamera: () => void;
   participants: Record<string, BroadcastParticipant>;
   guestCount: number;
+  // 호스트의 오디오/비디오 트랙 (게스트 화면에서 재생용)
+  hostVideoTrack: MediaStreamTrack | null;
+  hostAudioTrack: MediaStreamTrack | null;
   error: string | null;
   status: "idle" | "connecting" | "connected" | "error";
 }
@@ -44,42 +47,47 @@ export function useDailyBroadcast({
   const callRef = useRef<any>(null);
   const [joined, setJoined] = useState(false);
   const [localAudioOn, setLocalAudioOn] = useState(false);
+  const [localVideoOn, setLocalVideoOn] = useState(false);
   const [participants, setParticipants] = useState<Record<string, BroadcastParticipant>>({});
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<"idle" | "connecting" | "connected" | "error">("idle");
 
   useEffect(() => {
-    // ready + roomUrl + token 모두 확보된 이후에만 join
     if (!ready || !roomUrl || !token) return;
 
     let destroyed = false;
 
-    // useDailyCall과 동일한 패턴
     import("@daily-co/daily-js").then((mod) => {
       if (destroyed) return;
       const DailyIframe = mod.default;
 
-      // 호스트·게스트 모두 audioSource:true로 오디오 엔진 초기화
-      // → 게스트는 join 직후 즉시 뮤트하여 마이크는 막지만 수신은 허용
+      // 호스트: 마이크+카메라 모두 켜기 / 게스트: 수신 전용 (마이크만 초기화 후 즉시 뮤트)
       const call = DailyIframe.createCallObject({
         audioSource: true,
-        videoSource: false,
+        videoSource: isHost, // 호스트만 카메라 ON
       });
       callRef.current = call;
+
+      const syncParticipants = (ps: Record<string, BroadcastParticipant>) =>
+        setParticipants({ ...ps });
 
       call.on("joined-meeting", (e: { participants: Record<string, BroadcastParticipant> }) => {
         if (destroyed) return;
         setJoined(true);
         setStatus("connected");
         setError(null);
-        if (e.participants) setParticipants({ ...e.participants });
+        if (e.participants) syncParticipants(e.participants);
+
         if (isHost) {
-          // 호스트: 마이크 활성화
+          // 호스트: 마이크 + 카메라 활성화
           call.setLocalAudio(true);
+          call.setLocalVideo(true);
           setLocalAudioOn(true);
+          setLocalVideoOn(true);
         } else {
-          // 게스트: 마이크 즉시 뮤트 (audioSource:true로 초기화했으므로)
+          // 게스트: 마이크 즉시 뮤트, 카메라 off (수신 전용)
           call.setLocalAudio(false);
+          call.setLocalVideo(false);
         }
       });
 
@@ -103,8 +111,7 @@ export function useDailyBroadcast({
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       call.on("error", (e: any) => {
         if (destroyed) return;
-        const msg = e?.errorMsg ?? e?.error ?? "연결 오류";
-        setError(msg);
+        setError(e?.errorMsg ?? e?.error ?? "연결 오류");
         setStatus("error");
         console.error("[Daily] error:", e);
       });
@@ -128,10 +135,8 @@ export function useDailyBroadcast({
         });
     }).catch((e: unknown) => {
       if (destroyed) return;
-      const msg = e instanceof Error ? e.message : "SDK 로드 실패";
-      setError(msg);
+      setError(e instanceof Error ? e.message : "SDK 로드 실패");
       setStatus("error");
-      console.error("[Daily] SDK import failed:", e);
     });
 
     return () => {
@@ -154,17 +159,25 @@ export function useDailyBroadcast({
     setLocalAudioOn(next);
   }, [localAudioOn, isHost]);
 
+  const toggleCamera = useCallback(() => {
+    if (!callRef.current || !isHost) return;
+    const next = !localVideoOn;
+    callRef.current.setLocalVideo(next);
+    setLocalVideoOn(next);
+  }, [localVideoOn, isHost]);
+
+  // 원격 호스트 트랙 (게스트 입장에서 보이는 호스트, 로컬이 아닌 참가자)
+  const remoteHost = Object.values(participants).find(p => !p.local);
+  const hostVideoTrack = remoteHost?.tracks.video.persistentTrack ?? null;
+  const hostAudioTrack = remoteHost?.tracks.audio.persistentTrack ?? null;
+
   const guestCount = Object.values(participants).filter(p => !p.local).length;
 
   return {
-    joined,
-    localAudioOn,
-    localVideoOn: false,
-    toggleMic,
-    toggleCamera: () => {},
-    participants,
-    guestCount,
-    error,
-    status,
+    joined, localAudioOn, localVideoOn,
+    toggleMic, toggleCamera,
+    participants, guestCount,
+    hostVideoTrack, hostAudioTrack,
+    error, status,
   };
 }

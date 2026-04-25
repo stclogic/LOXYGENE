@@ -419,23 +419,32 @@ export default function ColosseumRoom001Page() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ── Broadcast countdown (호스트 시작시각 공유 → 게스트도 남은 시간 동기화) ──
+  // ── Broadcast countdown ────────────────────────────────────────────────────
   useEffect(() => {
     const KEY = "colosseum-broadcast-start";
     const TWO_HOURS = 2 * 60 * 60;
 
+    const raw = localStorage.getItem(KEY);
+
     if (isHost) {
-      // 호스트: 시작시각 기록 (이미 있으면 유지)
-      if (!localStorage.getItem(KEY)) {
+      if (!raw) {
+        // 호스트 첫 입장: 시작시각 기록
         localStorage.setItem(KEY, String(Date.now()));
       }
+    } else {
+      // 게스트: KEY 없으면 방송 준비중 — 카운트다운 시작 안 함
+      if (!raw) return;
     }
 
     const startTs = Number(localStorage.getItem(KEY) ?? Date.now());
     const elapsed = Math.floor((Date.now() - startTs) / 1000);
     const remaining = Math.max(0, TWO_HOURS - elapsed);
 
-    if (remaining === 0) { setBroadcastEnded(true); return; }
+    // 재접속 시 만료된 타이머가 있으면 조용히 초기화 (ended 화면 없이)
+    if (remaining === 0) {
+      localStorage.removeItem(KEY);
+      return;
+    }
     setSecondsLeft(remaining);
 
     countdownRef.current = setInterval(() => {

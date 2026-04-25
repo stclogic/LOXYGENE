@@ -28,6 +28,8 @@ interface UseDailyBroadcastReturn {
   toggleCamera: () => void;
   participants: Record<string, BroadcastParticipant>;
   guestCount: number;
+  error: string | null;
+  status: "idle" | "connecting" | "connected" | "error";
 }
 
 export function useDailyBroadcast({
@@ -40,8 +42,10 @@ export function useDailyBroadcast({
   const callRef = useRef<any>(null);
   const [joined, setJoined] = useState(false);
   const [localAudioOn, setLocalAudioOn] = useState(false);
-  const [localVideoOn, setLocalVideoOn] = useState(isHost); // 호스트만 기본 켜짐
+  const [localVideoOn, setLocalVideoOn] = useState(isHost);
   const [participants, setParticipants] = useState<Record<string, BroadcastParticipant>>({});
+  const [error, setError] = useState<string | null>(null);
+  const [status, setStatus] = useState<"idle" | "connecting" | "connected" | "error">("idle");
 
   useEffect(() => {
     if (!roomUrl) return;
@@ -71,16 +75,30 @@ export function useDailyBroadcast({
 
       call.on("joined-meeting", (e: { participants: Record<string, BroadcastParticipant> }) => {
         setJoined(true);
+        setStatus("connected");
+        setError(null);
         syncParticipants(e);
         if (isHost) {
-          // 호스트: 마이크 활성화
           call.setLocalAudio(true);
           setLocalAudioOn(true);
         } else {
-          // 게스트: 오디오 수신 명시적 활성화
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           (call as any).setSubscribeToTracksAutomatically?.(true);
         }
+      });
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      call.on("error", (e: any) => {
+        const msg = e?.errorMsg ?? e?.error ?? "Daily.co 연결 오류";
+        setError(msg);
+        setStatus("error");
+        console.error("[useDailyBroadcast] error:", e);
+      });
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      call.on("left-meeting", (_e: any) => {
+        setJoined(false);
+        setStatus("idle");
       });
 
       call.on("participant-joined", (e: { participant: BroadcastParticipant }) =>
@@ -101,7 +119,13 @@ export function useDailyBroadcast({
       if (token) joinOpts.token = token;
       if (nickname) joinOpts.userName = nickname;
 
-      call.join(joinOpts).catch(console.error);
+      setStatus("connecting");
+      call.join(joinOpts).catch((e: unknown) => {
+        const msg = e instanceof Error ? e.message : "join 실패";
+        setError(msg);
+        setStatus("error");
+        console.error("[useDailyBroadcast] join failed:", e);
+      });
     });
 
     return () => {
@@ -131,5 +155,5 @@ export function useDailyBroadcast({
 
   const guestCount = Object.values(participants).filter(p => !p.local).length;
 
-  return { joined, localAudioOn, localVideoOn, toggleMic, toggleCamera, participants, guestCount };
+  return { joined, localAudioOn, localVideoOn, toggleMic, toggleCamera, participants, guestCount, error, status };
 }

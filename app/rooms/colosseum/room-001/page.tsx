@@ -121,7 +121,7 @@ export default function ColosseumRoom001Page() {
   const [broadcastRole, setBroadcastRole]     = useState<"host" | "guest">("guest");
   const [nicknameForBroadcast, setNicknameForBroadcast] = useState("게스트");
 
-  const { joined, localAudioOn, localVideoOn, toggleMic, toggleCamera, guestCount } =
+  const { joined, localAudioOn, localVideoOn, toggleMic, toggleCamera, guestCount, error: dailyError, status: dailyStatus } =
     useDailyBroadcast({
       roomUrl:  broadcastRoomUrl,
       token:    broadcastToken,
@@ -704,11 +704,26 @@ export default function ColosseumRoom001Page() {
           )}
 
           {/* Daily 연결 상태 인디케이터 */}
-          {joined && (
+          {dailyStatus === "connecting" && (
+            <div className="flex items-center gap-1 px-2 py-1 rounded-full"
+              style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.15)" }}>
+              <span className="w-1.5 h-1.5 rounded-full bg-white/40 animate-pulse block" />
+              <span className="text-[9px] text-white/40 font-semibold tracking-wider">연결 중...</span>
+            </div>
+          )}
+          {dailyStatus === "connected" && (
             <div className="flex items-center gap-1 px-2 py-1 rounded-full"
               style={{ background: "rgba(0,229,255,0.08)", border: "1px solid rgba(0,229,255,0.2)" }}>
               <span className="w-1.5 h-1.5 rounded-full bg-[#00E5FF] animate-pulse block" />
               <span className="text-[9px] text-[#00E5FF] font-semibold tracking-wider">연결됨</span>
+            </div>
+          )}
+          {dailyStatus === "error" && (
+            <div className="flex items-center gap-1 px-2 py-1 rounded-full cursor-help"
+              title={dailyError ?? ""}
+              style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.3)" }}>
+              <span className="w-1.5 h-1.5 rounded-full bg-red-500 block" />
+              <span className="text-[9px] text-red-400 font-semibold tracking-wider">연결 실패</span>
             </div>
           )}
           <button

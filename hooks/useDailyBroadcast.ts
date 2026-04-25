@@ -54,9 +54,15 @@ export function useDailyBroadcast({
 
       const call = DailyIframe.createCallObject(
         isHost
-          ? { audioSource: true, videoSource: false }
-          : { audioSource: false, videoSource: false, subscribeToTracksAutomatically: true }
+          ? { audioSource: true,  videoSource: false }
+          : { audioSource: false, videoSource: false }
       );
+
+      // 게스트: 모든 참가자 오디오 트랙 자동 구독 (Daily SDK 기본값이지만 명시 설정)
+      if (!isHost) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (call as any).setSubscribeToTracksAutomatically?.(true);
+      }
       callRef.current = call;
 
       const syncParticipants = (data: { participants?: Record<string, BroadcastParticipant> }) => {
@@ -66,10 +72,14 @@ export function useDailyBroadcast({
       call.on("joined-meeting", (e: { participants: Record<string, BroadcastParticipant> }) => {
         setJoined(true);
         syncParticipants(e);
-        // 호스트 입장 시 마이크 즉시 ON (방송 시작)
         if (isHost) {
+          // 호스트: 마이크 활성화
           call.setLocalAudio(true);
           setLocalAudioOn(true);
+        } else {
+          // 게스트: 오디오 수신 명시적 활성화
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (call as any).setSubscribeToTracksAutomatically?.(true);
         }
       });
 

@@ -166,8 +166,11 @@ export function useDailyBroadcast({
     setLocalVideoOn(next);
   }, [localVideoOn, isHost]);
 
-  // 원격 호스트 트랙 (게스트 입장에서 보이는 호스트, 로컬이 아닌 참가자)
-  const remoteHost = Object.values(participants).find(p => !p.local);
+  // 원격 호스트 트랙 — 트랙 상태가 playable 인 참가자를 우선 선택
+  const remoteParticipants = Object.values(participants).filter(p => !p.local);
+  const remoteHost = remoteParticipants.find(
+    p => p.tracks.video.state === "playable" || p.tracks.audio.state === "playable"
+  ) ?? remoteParticipants[0];
   const hostVideoTrack = remoteHost?.tracks.video.persistentTrack ?? null;
   const hostAudioTrack = remoteHost?.tracks.audio.persistentTrack ?? null;
 

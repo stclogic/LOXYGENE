@@ -135,15 +135,30 @@ export default function ColosseumRoom001Page() {
     if (!isSupabaseConfigured) return;
     const ch = supabase.channel("broadcast:content:room-001")
       .on("broadcast", { event: "content" }, ({ payload }) => {
-        // 게스트: 호스트 상태를 받아 동기화
         if (payload.mainVideoPlaying !== undefined) setMainVideoPlaying(payload.mainVideoPlaying);
         if (payload.karaokeVideoId   !== undefined) setKaraokeVideoId(payload.karaokeVideoId);
         if (payload.karaokeLyrics    !== undefined) setKaraokeLyrics(payload.karaokeLyrics);
+        // 게스트: 호스트 방송 시작 시각 수신 → 카운트다운 동기화
+        if (payload.broadcastStartTs && !isHost) {
+          localStorage.setItem("colosseum-broadcast-start", String(payload.broadcastStartTs));
+          const elapsed = Math.floor((Date.now() - payload.broadcastStartTs) / 1000);
+          const remaining = Math.max(1, 2 * 60 * 60 - elapsed);
+          setSecondsLeft(remaining);
+          // 기존 인터벌 중지 후 재시작
+          if (countdownRef.current) clearInterval(countdownRef.current);
+          countdownRef.current = setInterval(() => {
+            setSecondsLeft(prev => {
+              if (prev <= 1) { clearInterval(countdownRef.current!); return 0; }
+              return prev - 1;
+            });
+          }, 1000);
+        }
       })
       .subscribe();
     contentChannelRef.current = ch;
     return () => { supabase.removeChannel(ch); };
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isHost]);
 
   // 호스트가 상태 변경할 때마다 브로드캐스트
   const broadcastContent = useCallback((patch: Record<string, unknown>) => {
@@ -440,12 +455,21 @@ export default function ColosseumRoom001Page() {
     const elapsed = Math.floor((Date.now() - startTs) / 1000);
     const remaining = Math.max(0, TWO_HOURS - elapsed);
 
-    // 재접속 시 만료된 타이머가 있으면 조용히 초기화 (ended 화면 없이)
-    if (remaining === 0) {
-      localStorage.removeItem(KEY);
-      return;
-    }
+    if (remaining === 0) { localStorage.removeItem(KEY); return; }
     setSecondsLeft(remaining);
+
+    // 호스트: 게스트에게 시작시각 즉시 + 10초마다 재전송 (늦게 입장한 게스트 동기화)
+    if (isHost && isSupabaseConfigured) {
+      const sendTs = () => contentChannelRef.current?.send({
+        type: "broadcast", event: "content",
+        payload: { broadcastStartTs: startTs },
+      });
+      sendTs();
+      const syncInterval = setInterval(sendTs, 10000);
+      // 방송 종료 시 정리
+      const cleanup = () => clearInterval(syncInterval);
+      window.addEventListener("beforeunload", cleanup, { once: true });
+    }
 
     countdownRef.current = setInterval(() => {
       setSecondsLeft(prev => {
@@ -934,9 +958,12 @@ export default function ColosseumRoom001Page() {
                   {activeTab === tab && <span className="absolute bottom-0 left-0 right-0 h-[2px] rounded-full" style={{ background: "#00E5FF" }} />}
                 </button>
               ))}
-              <div className="ml-auto px-2 py-0.5 rounded-full text-[10px] font-medium mr-1"
-                style={{ background: "rgba(0,229,255,0.1)", color: "#00E5FF", border: "1px solid rgba(0,229,255,0.2)" }}>
-                {participants.length}명
+              <div className="ml-auto flex items-center gap-1.5 mr-1">
+                <span className={`w-1.5 h-1.5 rounded-full ${chatConnected ? "bg-green-400" : "bg-red-400"}`} title={chatConnected ? "채팅 연결됨" : "채팅 연결 중..."} />
+                <div className="px-2 py-0.5 rounded-full text-[10px] font-medium"
+                  style={{ background: "rgba(0,229,255,0.1)", color: "#00E5FF", border: "1px solid rgba(0,229,255,0.2)" }}>
+                  {participants.length}명
+                </div>
               </div>
             </div>
 

@@ -18,6 +18,7 @@ interface UseDailyBroadcastOptions {
   token: string | null;
   isHost: boolean;
   nickname: string;
+  ready: boolean; // API 응답 완료 후 true — 이전에는 join 시도 안 함
 }
 
 interface UseDailyBroadcastReturn {
@@ -37,95 +38,94 @@ export function useDailyBroadcast({
   token,
   isHost,
   nickname,
+  ready,
 }: UseDailyBroadcastOptions): UseDailyBroadcastReturn {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const callRef = useRef<any>(null);
   const [joined, setJoined] = useState(false);
   const [localAudioOn, setLocalAudioOn] = useState(false);
-  const [localVideoOn, setLocalVideoOn] = useState(isHost);
   const [participants, setParticipants] = useState<Record<string, BroadcastParticipant>>({});
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<"idle" | "connecting" | "connected" | "error">("idle");
 
   useEffect(() => {
-    if (!roomUrl) return;
+    // ready + roomUrl + token 모두 확보된 이후에만 join
+    if (!ready || !roomUrl || !token) return;
 
     let destroyed = false;
 
+    // useDailyCall과 동일한 패턴
     import("@daily-co/daily-js").then((mod) => {
       if (destroyed) return;
       const DailyIframe = mod.default;
 
-      const call = DailyIframe.createCallObject(
-        isHost
-          ? { audioSource: true,  videoSource: false }
-          : { audioSource: false, videoSource: false }
-      );
-
-      // 게스트: 모든 참가자 오디오 트랙 자동 구독 (Daily SDK 기본값이지만 명시 설정)
-      if (!isHost) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (call as any).setSubscribeToTracksAutomatically?.(true);
-      }
+      const call = DailyIframe.createCallObject({
+        audioSource: isHost,   // 호스트만 마이크 열기
+        videoSource: false,    // 비디오 불필요
+      });
       callRef.current = call;
 
-      const syncParticipants = (data: { participants?: Record<string, BroadcastParticipant> }) => {
-        if (data.participants) setParticipants({ ...data.participants });
-      };
-
       call.on("joined-meeting", (e: { participants: Record<string, BroadcastParticipant> }) => {
+        if (destroyed) return;
         setJoined(true);
         setStatus("connected");
         setError(null);
-        syncParticipants(e);
+        if (e.participants) setParticipants({ ...e.participants });
         if (isHost) {
           call.setLocalAudio(true);
           setLocalAudioOn(true);
-        } else {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (call as any).setSubscribeToTracksAutomatically?.(true);
         }
       });
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      call.on("error", (e: any) => {
-        const msg = e?.errorMsg ?? e?.error ?? "Daily.co 연결 오류";
-        setError(msg);
-        setStatus("error");
-        console.error("[useDailyBroadcast] error:", e);
+      call.on("participant-joined", (e: { participant: BroadcastParticipant }) => {
+        if (destroyed) return;
+        setParticipants(prev => ({ ...prev, [e.participant.session_id]: e.participant }));
       });
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      call.on("left-meeting", (_e: any) => {
-        setJoined(false);
-        setStatus("idle");
+      call.on("participant-updated", (e: { participant: BroadcastParticipant }) => {
+        if (destroyed) return;
+        setParticipants(prev => ({ ...prev, [e.participant.session_id]: e.participant }));
       });
-
-      call.on("participant-joined", (e: { participant: BroadcastParticipant }) =>
-        setParticipants(prev => ({ ...prev, [e.participant.session_id]: e.participant }))
-      );
-      call.on("participant-updated", (e: { participant: BroadcastParticipant }) =>
-        setParticipants(prev => ({ ...prev, [e.participant.session_id]: e.participant }))
-      );
-      call.on("participant-left", (e: { participant: BroadcastParticipant }) =>
+      call.on("participant-left", (e: { participant: BroadcastParticipant }) => {
+        if (destroyed) return;
         setParticipants(prev => {
           const next = { ...prev };
           delete next[e.participant.session_id];
           return next;
-        })
-      );
+        });
+      });
 
-      const joinOpts: Record<string, unknown> = { url: roomUrl };
-      if (token) joinOpts.token = token;
-      if (nickname) joinOpts.userName = nickname;
-
-      setStatus("connecting");
-      call.join(joinOpts).catch((e: unknown) => {
-        const msg = e instanceof Error ? e.message : "join 실패";
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      call.on("error", (e: any) => {
+        if (destroyed) return;
+        const msg = e?.errorMsg ?? e?.error ?? "연결 오류";
         setError(msg);
         setStatus("error");
-        console.error("[useDailyBroadcast] join failed:", e);
+        console.error("[Daily] error:", e);
       });
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      call.on("left-meeting", (_e: any) => {
+        if (destroyed) return;
+        setJoined(false);
+        setStatus("idle");
+      });
+
+      setStatus("connecting");
+      call
+        .join({ url: roomUrl, token, userName: nickname })
+        .catch((e: unknown) => {
+          if (destroyed) return;
+          const msg = e instanceof Error ? e.message : "join 실패";
+          setError(msg);
+          setStatus("error");
+          console.error("[Daily] join failed:", e);
+        });
+    }).catch((e: unknown) => {
+      if (destroyed) return;
+      const msg = e instanceof Error ? e.message : "SDK 로드 실패";
+      setError(msg);
+      setStatus("error");
+      console.error("[Daily] SDK import failed:", e);
     });
 
     return () => {
@@ -135,9 +135,11 @@ export function useDailyBroadcast({
         callRef.current.destroy().catch(() => {});
         callRef.current = null;
       }
+      setJoined(false);
+      setStatus("idle");
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roomUrl, token]);
+  }, [ready, roomUrl, token]);
 
   const toggleMic = useCallback(() => {
     if (!callRef.current || !isHost) return;
@@ -146,14 +148,17 @@ export function useDailyBroadcast({
     setLocalAudioOn(next);
   }, [localAudioOn, isHost]);
 
-  const toggleCamera = useCallback(() => {
-    if (!callRef.current || !isHost) return;
-    const next = !localVideoOn;
-    callRef.current.setLocalVideo(next);
-    setLocalVideoOn(next);
-  }, [localVideoOn, isHost]);
-
   const guestCount = Object.values(participants).filter(p => !p.local).length;
 
-  return { joined, localAudioOn, localVideoOn, toggleMic, toggleCamera, participants, guestCount, error, status };
+  return {
+    joined,
+    localAudioOn,
+    localVideoOn: false,
+    toggleMic,
+    toggleCamera: () => {},
+    participants,
+    guestCount,
+    error,
+    status,
+  };
 }

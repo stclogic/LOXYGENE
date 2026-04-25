@@ -120,6 +120,7 @@ export default function ColosseumRoom001Page() {
   const [broadcastToken, setBroadcastToken]   = useState<string | null>(null);
   const [broadcastRole, setBroadcastRole]     = useState<"host" | "guest">("guest");
   const [nicknameForBroadcast, setNicknameForBroadcast] = useState("게스트");
+  const [broadcastReady, setBroadcastReady]   = useState(false); // API 완료 후 true
 
   const { joined, localAudioOn, localVideoOn, toggleMic, toggleCamera, guestCount, error: dailyError, status: dailyStatus } =
     useDailyBroadcast({
@@ -127,6 +128,7 @@ export default function ColosseumRoom001Page() {
       token:    broadcastToken,
       isHost:   broadcastRole === "host",
       nickname: nicknameForBroadcast,
+      ready:    broadcastReady,
     });
 
   // Broadcast countdown (2 hours = 7200s) — starts on mount
@@ -279,13 +281,13 @@ export default function ColosseumRoom001Page() {
     })
       .then(r => r.ok ? r.json() : null)
       .then(data => {
-        if (!data) return;
-        if (data.roomUrl) setBroadcastRoomUrl(data.roomUrl);
-        if (data.token)   setBroadcastToken(data.token);
-        if (data.role) {
-          setBroadcastRole(data.role);
-          setIsHost(data.role === "host"); // host/guest 모두 명시적 설정
-        }
+        if (!data || !data.roomUrl || !data.token) return;
+        // 모든 값을 한 번에 설정 후 ready = true (React 18 자동 배치)
+        setBroadcastRoomUrl(data.roomUrl);
+        setBroadcastToken(data.token);
+        setBroadcastRole(data.role ?? "guest");
+        setIsHost(data.role === "host");
+        setBroadcastReady(true); // ← 이 시점에 useDailyBroadcast join 시작
       })
       .catch(console.error);
   }, []);

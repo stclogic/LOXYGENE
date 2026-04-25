@@ -4,7 +4,7 @@ import { isSuperAdmin } from "@/lib/admin";
 import { ensureBroadcastRoom, createBroadcastToken } from "@/lib/daily";
 
 const BROADCAST_ROOM_NAME = "the-colosseum";
-const BROADCAST_ROOM_URL  = "https://loxygene.daily.co/the-colosseum";
+const BROADCAST_ROOM_URL  = "https://zigglelink.daily.co/the-colosseum";
 
 export async function POST(req: NextRequest) {
   const session = await auth();

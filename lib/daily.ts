@@ -24,7 +24,7 @@ export async function ensureBroadcastRoom(roomName: string) {
       name: roomName,
       privacy: "private",          // 토큰 없이 입장 불가
       properties: {
-        max_participants: 500,
+        max_participants: 10,
         enable_chat: false,
         enable_screenshare: false,
         enable_recording: false,

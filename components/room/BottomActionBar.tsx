@@ -21,9 +21,10 @@ interface BottomActionBarProps {
   roomId?: string;
   hostId?: string;
   directorId?: string | null;
+  onSettingsClick?: () => void; // 제공 시 /control-panel 이동 대신 콜백 실행
 }
 
-export function BottomActionBar({ roomId, hostId, directorId }: BottomActionBarProps) {
+export function BottomActionBar({ roomId, hostId, directorId, onSettingsClick }: BottomActionBarProps) {
   const { isInQueue, queuePosition, joinQueue, leaveQueue } = useRoomStore();
   const { isCameraActive, isMicActive, toggleMic, toggleCamera } = useLocalStream();
   const { wallet, sendGift, chargeCredits } = useWallet();
@@ -208,16 +209,29 @@ export function BottomActionBar({ roomId, hostId, directorId }: BottomActionBarP
           <span className="text-[10px] leading-none text-white/30 lg:hidden">F&amp;B</span>
         </button>
 
-        {/* Settings / Control Panel */}
-        <Link
-          href="/control-panel"
-          className="flex flex-col items-center justify-center gap-1 min-w-[44px] min-h-[44px] rounded-xl px-2 py-2 transition-all duration-200 active:scale-95"
-          style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}
-          title="컨트롤 패널"
-        >
-          <Icon icon="solar:settings-linear" className="text-xl lg:text-base w-6 h-6 lg:w-5 lg:h-5 text-white/40" />
-          <span className="text-[10px] leading-none text-white/30 lg:hidden">설정</span>
-        </Link>
+        {/* Settings — 팝업 콜백 있으면 버튼, 없으면 페이지 이동 */}
+        {onSettingsClick ? (
+          <button
+            type="button"
+            onClick={onSettingsClick}
+            className="flex flex-col items-center justify-center gap-1 min-w-[44px] min-h-[44px] rounded-xl px-2 py-2 transition-all duration-200 active:scale-95"
+            style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}
+            title="설정"
+          >
+            <Icon icon="solar:settings-linear" className="text-xl lg:text-base w-6 h-6 lg:w-5 lg:h-5 text-white/40" />
+            <span className="text-[10px] leading-none text-white/30 lg:hidden">설정</span>
+          </button>
+        ) : (
+          <Link
+            href="/control-panel"
+            className="flex flex-col items-center justify-center gap-1 min-w-[44px] min-h-[44px] rounded-xl px-2 py-2 transition-all duration-200 active:scale-95"
+            style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}
+            title="컨트롤 패널"
+          >
+            <Icon icon="solar:settings-linear" className="text-xl lg:text-base w-6 h-6 lg:w-5 lg:h-5 text-white/40" />
+            <span className="text-[10px] leading-none text-white/30 lg:hidden">설정</span>
+          </Link>
+        )}
       </div>
 
       {/* Charge modal — rendered in-place when needed from action bar */}

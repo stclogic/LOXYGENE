@@ -231,6 +231,18 @@ export default function ColosseumRoom001Page() {
   const [hostStream, setHostStream] = useState<MediaStream | null>(null);
   const hostVideoRef = useRef<HTMLVideoElement>(null);
 
+  // 설정 팝업 + 볼륨
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [speakerVol, setSpeakerVol] = useState(80); // 0-100
+  const [micVol, setMicVol]         = useState(80); // 0-100 (Daily.co mic gain)
+
+  // 볼륨 변경 → 오디오 엘리먼트 즉시 반영
+  useEffect(() => {
+    if (remoteAudioRef.current) {
+      remoteAudioRef.current.volume = speakerVol / 100;
+    }
+  }, [speakerVol]);
+
   // Panel tabs
   const [activeTab, setActiveTab] = useState<"chat" | "queue">("chat");
 
@@ -1213,14 +1225,14 @@ export default function ColosseumRoom001Page() {
 
         {/* Desktop action bar */}
         <div className="hidden lg:block flex-shrink-0">
-          <BottomActionBar />
+          <BottomActionBar onSettingsClick={() => setSettingsOpen(true)} />
         </div>
       </div>
 
       {/* Mobile action bar */}
       <div className="lg:hidden fixed bottom-0 inset-x-0 z-30 px-3 pt-3 pb-3"
         style={{ background: "linear-gradient(to top, rgba(7,7,7,0.98) 70%, transparent)" }}>
-        <BottomActionBar />
+        <BottomActionBar onSettingsClick={() => setSettingsOpen(true)} />
       </div>
 
       {/* Toasts */}
@@ -1447,6 +1459,106 @@ export default function ColosseumRoom001Page() {
               {line}
             </p>
           ))}
+        </div>
+      )}
+
+      {/* ── 설정 팝업 ── */}
+      {settingsOpen && (
+        <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center px-4 pb-4 sm:pb-0"
+          style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(8px)" }}
+          onClick={e => { if (e.target === e.currentTarget) setSettingsOpen(false); }}>
+          <div className="w-full max-w-xs rounded-2xl overflow-hidden"
+            style={{ background: "rgba(8,8,20,0.98)", border: "1px solid rgba(255,255,255,0.1)", boxShadow: "0 0 30px rgba(0,0,0,0.8)" }}>
+
+            {/* 헤더 */}
+            <div className="flex items-center justify-between px-5 py-3.5 border-b"
+              style={{ borderColor: "rgba(255,255,255,0.07)" }}>
+              <span className="text-sm font-bold text-white">⚙️ 설정</span>
+              <button type="button" title="닫기" onClick={() => setSettingsOpen(false)}
+                className="text-white/30 hover:text-white/70 transition-colors">
+                <Icon icon="solar:close-circle-bold" className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="px-5 py-4 flex flex-col gap-5">
+              {/* 방송 음량 */}
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium text-white/60">🔊 방송 음량</span>
+                  <span className="text-sm font-black tabular-nums" style={{ color: "#00E5FF" }}>{speakerVol}%</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <button type="button"
+                    onClick={() => setSpeakerVol(v => Math.max(0, v - 10))}
+                    className="w-10 h-10 rounded-xl flex items-center justify-center text-xl font-black transition-all active:scale-95 hover:opacity-80"
+                    style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.7)" }}>
+                    −
+                  </button>
+                  <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.08)" }}>
+                    <div className="h-full rounded-full transition-all"
+                      style={{ width: `${speakerVol}%`, background: "linear-gradient(90deg, #00E5FF, #0099cc)" }} />
+                  </div>
+                  <button type="button"
+                    onClick={() => setSpeakerVol(v => Math.min(100, v + 10))}
+                    className="w-10 h-10 rounded-xl flex items-center justify-center text-xl font-black transition-all active:scale-95 hover:opacity-80"
+                    style={{ background: "rgba(0,229,255,0.1)", border: "1px solid rgba(0,229,255,0.3)", color: "#00E5FF" }}>
+                    +
+                  </button>
+                </div>
+              </div>
+
+              {/* 마이크 음량 (호스트 전용) */}
+              {isHost && (
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-white/60">🎤 마이크 음량</span>
+                    <span className="text-sm font-black tabular-nums" style={{ color: "#ec4899" }}>{micVol}%</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <button type="button"
+                      onClick={() => {
+                        const next = Math.max(0, micVol - 10);
+                        setMicVol(next);
+                        // Daily.co 마이크 gain 조절 (setLocalAudio로 토글)
+                        if (next === 0) { toggleMic(); }
+                      }}
+                      className="w-10 h-10 rounded-xl flex items-center justify-center text-xl font-black transition-all active:scale-95 hover:opacity-80"
+                      style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.7)" }}>
+                      −
+                    </button>
+                    <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.08)" }}>
+                      <div className="h-full rounded-full transition-all"
+                        style={{ width: `${micVol}%`, background: "linear-gradient(90deg, #ec4899, #be185d)" }} />
+                    </div>
+                    <button type="button"
+                      onClick={() => {
+                        const next = Math.min(100, micVol + 10);
+                        setMicVol(next);
+                        if (next > 0 && !localAudioOn) { toggleMic(); }
+                      }}
+                      className="w-10 h-10 rounded-xl flex items-center justify-center text-xl font-black transition-all active:scale-95 hover:opacity-80"
+                      style={{ background: "rgba(236,72,153,0.1)", border: "1px solid rgba(236,72,153,0.3)", color: "#ec4899" }}>
+                      +
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* 마이크 ON/OFF 퀵 토글 (호스트 전용) */}
+              {isHost && joined && (
+                <button type="button" onClick={() => { toggleMic(); setSettingsOpen(false); }}
+                  className="w-full py-2.5 rounded-xl text-sm font-bold transition-all active:scale-95"
+                  style={{
+                    background: localAudioOn ? "rgba(0,229,255,0.1)" : "rgba(239,68,68,0.1)",
+                    border: `1px solid ${localAudioOn ? "rgba(0,229,255,0.3)" : "rgba(239,68,68,0.3)"}`,
+                    color: localAudioOn ? "#00E5FF" : "#ef4444",
+                  }}>
+                  <Icon icon={localAudioOn ? "solar:microphone-bold" : "solar:microphone-slash-bold"} className="inline w-4 h-4 mr-1.5" />
+                  마이크 {localAudioOn ? "끄기" : "켜기"}
+                </button>
+              )}
+            </div>
+          </div>
         </div>
       )}
 

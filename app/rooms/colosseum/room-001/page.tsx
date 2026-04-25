@@ -140,6 +140,9 @@ export default function ColosseumRoom001Page() {
   const [broadcastEnded, setBroadcastEnded] = useState(false);
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // 비호스트가 호스트 기능 클릭 시 안내 모달
+  const [hostInfoOpen, setHostInfoOpen] = useState(false);
+
   const formatCountdown = (s: number) => {
     const h = Math.floor(s / 3600);
     const m = Math.floor((s % 3600) / 60);
@@ -587,6 +590,18 @@ export default function ColosseumRoom001Page() {
       </button>
       <QuickCallModal open={directorOpen} onClose={() => setDirectorOpen(false)} roomId="room-001" />
 
+      {/* 노래방 버튼 — 비호스트 클릭 시 안내 */}
+      {!isHost && (
+        <button
+          type="button"
+          onClick={() => setHostInfoOpen(true)}
+          className="fixed top-14 left-36 z-50 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all hover:scale-105 active:scale-95"
+          style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.3)", backdropFilter: "blur(12px)" }}
+        >
+          <Icon icon="solar:music-note-2-bold" className="w-3.5 h-3.5" />
+          🎤 노래방
+        </button>
+      )}
       {/* 노래방 버튼 (호스트 전용) */}
       {isHost && (
         <button
@@ -1306,6 +1321,51 @@ export default function ColosseumRoom001Page() {
               {line}
             </p>
           ))}
+        </div>
+      )}
+
+      {/* ── 호스트 권한 안내 모달 ── */}
+      {hostInfoOpen && (
+        <div className="fixed inset-0 z-[75] flex items-center justify-center px-4"
+          style={{ background: "rgba(0,0,0,0.85)", backdropFilter: "blur(12px)" }}
+          onClick={e => { if (e.target === e.currentTarget) setHostInfoOpen(false); }}>
+          <div className="w-full max-w-sm rounded-2xl overflow-hidden"
+            style={{ background: "rgba(8,8,20,0.99)", border: "1px solid rgba(0,229,255,0.2)", boxShadow: "0 0 40px rgba(0,229,255,0.06)" }}>
+            <div className="px-5 py-4 border-b flex items-center justify-between"
+              style={{ borderColor: "rgba(255,255,255,0.07)" }}>
+              <span className="text-sm font-bold text-white">👑 호스트 전용 기능</span>
+              <button type="button" title="닫기" onClick={() => setHostInfoOpen(false)}
+                className="text-white/30 hover:text-white/60 transition-colors">
+                <Icon icon="solar:close-circle-bold" className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6 flex flex-col gap-4">
+              <p className="text-white/60 text-sm leading-relaxed">
+                이 기능은 <span className="text-[#00E5FF] font-bold">유료 아이템을 구매한 회원</span>에게만 제공되는 호스트 전용 기능입니다.
+              </p>
+              <div className="rounded-xl p-4 flex flex-col gap-2"
+                style={{ background: "rgba(0,229,255,0.05)", border: "1px solid rgba(0,229,255,0.15)" }}>
+                <p className="text-[11px] font-bold text-[#00E5FF] tracking-wider">호스트가 되려면</p>
+                <ul className="text-xs text-white/50 flex flex-col gap-1.5">
+                  <li>• 쇼핑몰에서 아이템을 1회 이상 구매</li>
+                  <li>• 구매 후 다시 입장하면 호스트로 자동 전환</li>
+                  <li>• 노래방, 영상 제어, 대기열 관리 등 사용 가능</li>
+                </ul>
+              </div>
+              <div className="flex gap-3">
+                <button type="button" onClick={() => setHostInfoOpen(false)}
+                  className="flex-1 py-2.5 rounded-xl text-sm font-medium transition-all"
+                  style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.4)" }}>
+                  닫기
+                </button>
+                <button type="button" onClick={() => { setHostInfoOpen(false); window.open("/shop", "_blank"); }}
+                  className="flex-1 py-2.5 rounded-xl text-sm font-bold transition-all hover:opacity-80"
+                  style={{ background: "rgba(0,229,255,0.12)", border: "1px solid rgba(0,229,255,0.4)", color: "#00E5FF" }}>
+                  쇼핑몰 가기
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 

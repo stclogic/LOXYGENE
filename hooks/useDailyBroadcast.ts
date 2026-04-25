@@ -52,11 +52,11 @@ export function useDailyBroadcast({
       if (destroyed) return;
       const DailyIframe = mod.default;
 
-      const call = DailyIframe.createCallObject({
-        // 호스트: 미디어 장치 열기 / 게스트: 장치 비활성 (수신 전용)
-        audioSource: isHost,
-        videoSource: isHost,
-      });
+      const call = DailyIframe.createCallObject(
+        isHost
+          ? { audioSource: true, videoSource: false }
+          : { audioSource: false, videoSource: false, subscribeToTracksAutomatically: true }
+      );
       callRef.current = call;
 
       const syncParticipants = (data: { participants?: Record<string, BroadcastParticipant> }) => {

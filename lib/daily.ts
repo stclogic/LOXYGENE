@@ -28,7 +28,6 @@ export async function ensureBroadcastRoom(roomName: string) {
         enable_chat: false,
         enable_screenshare: false,
         enable_recording: false,
-        owner_only_broadcast: true,
         eject_at_room_exp: false, // 방 만료 시 자동 퇴장 방지 → 미팅 유지
       },
     }),

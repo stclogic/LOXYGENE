@@ -19,6 +19,7 @@ interface UseDailyBroadcastOptions {
   isHost: boolean;
   nickname: string;
   ready: boolean;
+  onAppMessage?: (data: unknown) => void; // 수신 콜백
 }
 
 interface UseDailyBroadcastReturn {
@@ -29,9 +30,9 @@ interface UseDailyBroadcastReturn {
   toggleCamera: () => void;
   participants: Record<string, BroadcastParticipant>;
   guestCount: number;
-  // 호스트의 오디오/비디오 트랙 (게스트 화면에서 재생용)
   hostVideoTrack: MediaStreamTrack | null;
   hostAudioTrack: MediaStreamTrack | null;
+  sendAppMessage: (data: unknown) => void; // 전체 참가자에게 데이터 전송
   error: string | null;
   status: "idle" | "connecting" | "connected" | "error";
 }
@@ -42,6 +43,7 @@ export function useDailyBroadcast({
   isHost,
   nickname,
   ready,
+  onAppMessage,
 }: UseDailyBroadcastOptions): UseDailyBroadcastReturn {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const callRef = useRef<any>(null);
@@ -123,6 +125,16 @@ export function useDailyBroadcast({
         setStatus("idle");
       });
 
+      // Daily 앱 메시지 — 채팅·타이머·콘텐츠 동기화용
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      call.on("app-message", (e: any) => {
+        if (destroyed) return;
+        try {
+          const data = typeof e.data === "string" ? JSON.parse(e.data) : e.data;
+          onAppMessage?.(data);
+        } catch { /* ignore */ }
+      });
+
       setStatus("connecting");
       call
         .join({ url: roomUrl, token, userName: nickname })
@@ -151,6 +163,15 @@ export function useDailyBroadcast({
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, roomUrl, token]);
+
+  const sendAppMessage = useCallback((data: unknown) => {
+    if (!callRef.current) return;
+    try {
+      callRef.current.sendAppMessage(data, "*");
+    } catch (e) {
+      console.error("[Daily] sendAppMessage failed:", e);
+    }
+  }, []);
 
   const toggleMic = useCallback(() => {
     if (!callRef.current || !isHost) return;
@@ -181,6 +202,7 @@ export function useDailyBroadcast({
     toggleMic, toggleCamera,
     participants, guestCount,
     hostVideoTrack, hostAudioTrack,
+    sendAppMessage,
     error, status,
   };
 }

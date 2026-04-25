@@ -127,43 +127,38 @@ export default function ColosseumRoom001Page() {
   const [nicknameForBroadcast, setNicknameForBroadcast] = useState("게스트");
   const [broadcastReady, setBroadcastReady]   = useState(false); // API 완료 후 true
 
-  // ── 콘텐츠 동기화 채널 (Supabase Broadcast) ───────────────────────────────
-  // 호스트가 재생하는 영상/카라오케를 게스트에게 실시간 전송
-  const contentChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  // ── Daily app-message 수신 핸들러 (채팅·타이머·콘텐츠 동기화) ─────────────
+  const handleAppMessage = useCallback((data: unknown) => {
+    const msg = data as Record<string, unknown>;
+    if (!msg || typeof msg !== "object") return;
 
-  useEffect(() => {
-    if (!isSupabaseConfigured) return;
-    const ch = supabase.channel("broadcast:content:room-001")
-      .on("broadcast", { event: "content" }, ({ payload }) => {
-        if (payload.mainVideoPlaying !== undefined) setMainVideoPlaying(payload.mainVideoPlaying);
-        if (payload.karaokeVideoId   !== undefined) setKaraokeVideoId(payload.karaokeVideoId);
-        if (payload.karaokeLyrics    !== undefined) setKaraokeLyrics(payload.karaokeLyrics);
-        // 게스트: 호스트 방송 시작 시각 수신 → 카운트다운 동기화
-        if (payload.broadcastStartTs && !isHost) {
-          localStorage.setItem("colosseum-broadcast-start", String(payload.broadcastStartTs));
-          const elapsed = Math.floor((Date.now() - payload.broadcastStartTs) / 1000);
-          const remaining = Math.max(1, 2 * 60 * 60 - elapsed);
-          setSecondsLeft(remaining);
-          // 기존 인터벌 중지 후 재시작
-          if (countdownRef.current) clearInterval(countdownRef.current);
-          countdownRef.current = setInterval(() => {
-            setSecondsLeft(prev => {
-              if (prev <= 1) { clearInterval(countdownRef.current!); return 0; }
-              return prev - 1;
-            });
-          }, 1000);
-        }
-      })
-      .subscribe();
-    contentChannelRef.current = ch;
-    return () => { supabase.removeChannel(ch); };
+    // 채팅 메시지
+    if (msg._type === "chat") {
+      sendRealtimeMessage(String(msg.text ?? ""), (msg.msgType as "chat" | "system") ?? "chat");
+      return;
+    }
+    // 콘텐츠 동기화 (게스트만 적용)
+    if (msg._type === "content" && !isHost) {
+      if (msg.mainVideoPlaying !== undefined) setMainVideoPlaying(Boolean(msg.mainVideoPlaying));
+      if (msg.karaokeVideoId   !== undefined) setKaraokeVideoId(msg.karaokeVideoId as string | null);
+      if (msg.karaokeLyrics    !== undefined) setKaraokeLyrics(msg.karaokeLyrics as string[]);
+    }
+    // 타이머 동기화 (게스트만 적용)
+    if (msg._type === "timer" && !isHost && msg.startTs) {
+      const startTs = Number(msg.startTs);
+      localStorage.setItem("colosseum-broadcast-start", String(startTs));
+      const elapsed = Math.floor((Date.now() - startTs) / 1000);
+      const remaining = Math.max(1, 2 * 60 * 60 - elapsed);
+      setSecondsLeft(remaining);
+      if (countdownRef.current) clearInterval(countdownRef.current);
+      countdownRef.current = setInterval(() => {
+        setSecondsLeft(prev => {
+          if (prev <= 1) { clearInterval(countdownRef.current!); return 0; }
+          return prev - 1;
+        });
+      }, 1000);
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isHost]);
-
-  // 호스트가 상태 변경할 때마다 브로드캐스트
-  const broadcastContent = useCallback((patch: Record<string, unknown>) => {
-    if (!isHost || !isSupabaseConfigured) return;
-    contentChannelRef.current?.send({ type: "broadcast", event: "content", payload: patch });
   }, [isHost]);
 
   const {
@@ -171,14 +166,23 @@ export default function ColosseumRoom001Page() {
     toggleMic, toggleCamera,
     guestCount,
     hostVideoTrack, hostAudioTrack,
+    sendAppMessage,
     error: dailyError, status: dailyStatus,
+    participants: dailyParticipants,
   } = useDailyBroadcast({
     roomUrl:  broadcastRoomUrl,
     token:    broadcastToken,
     isHost:   broadcastRole === "host",
     nickname: nicknameForBroadcast,
     ready:    broadcastReady,
+    onAppMessage: handleAppMessage,
   });
+
+  // 호스트: Daily app-message로 콘텐츠 상태 전송
+  const broadcastContent = useCallback((patch: Record<string, unknown>) => {
+    if (!isHost) return;
+    sendAppMessage({ _type: "content", ...patch });
+  }, [isHost, sendAppMessage]);
 
   // 게스트: 호스트 Daily 비디오 트랙을 <video>에 연결
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
@@ -261,9 +265,22 @@ export default function ColosseumRoom001Page() {
   const [queue, setQueue] = useState<QueueItem[]>(INIT_QUEUE);
   const [activeSongId, setActiveSongId] = useState<string | null>(null);
 
-  // Participants
-  const [participants, setParticipants] = useState<RoomParticipant[]>(INIT_PARTICIPANTS);
+  // Participants — Daily 실접속자로 동기화
+  const [participants, setParticipants] = useState<RoomParticipant[]>([]);
   const [participantModalQueueId, setParticipantModalQueueId] = useState<string | null>(null);
+
+  // Daily 참가자 → 하단 접속자 목록 동기화
+  useEffect(() => {
+    const list: RoomParticipant[] = Object.values(dailyParticipants).map(p => ({
+      id: p.session_id,
+      nickname: p.user_name ?? (p.local ? nicknameForBroadcast : "게스트"),
+      isMuted: !p.tracks.audio.persistentTrack,
+      isCurrentSinger: false,
+      isVIP: false,
+      isHost: p.local ? (broadcastRole === "host") : false,
+    }));
+    setParticipants(list);
+  }, [dailyParticipants, nicknameForBroadcast, broadcastRole]);
 
   // Now playing
   const [nowPlaying, setNowPlaying] = useState<{ song: string; singer: string } | null>(null);
@@ -458,15 +475,11 @@ export default function ColosseumRoom001Page() {
     if (remaining === 0) { localStorage.removeItem(KEY); return; }
     setSecondsLeft(remaining);
 
-    // 호스트: 게스트에게 시작시각 즉시 + 10초마다 재전송 (늦게 입장한 게스트 동기화)
-    if (isHost && isSupabaseConfigured) {
-      const sendTs = () => contentChannelRef.current?.send({
-        type: "broadcast", event: "content",
-        payload: { broadcastStartTs: startTs },
-      });
+    // 호스트: 게스트에게 타이머 시작시각 전송 (10초마다, 늦게 입장한 게스트 동기화)
+    if (isHost) {
+      const sendTs = () => sendAppMessage({ _type: "timer", startTs });
       sendTs();
       const syncInterval = setInterval(sendTs, 10000);
-      // 방송 종료 시 정리
       const cleanup = () => clearInterval(syncInterval);
       window.addEventListener("beforeunload", cleanup, { once: true });
     }
@@ -507,8 +520,10 @@ export default function ColosseumRoom001Page() {
   }, []);
 
   // ── Helpers ────────────────────────────────────────────────────────────────
-  const addSysMsg = (text: string) =>
+  const addSysMsg = (text: string) => {
     sendRealtimeMessage(text, "system");
+    sendAppMessage({ _type: "chat", text, msgType: "system", nickname: "system" });
+  };
 
   const showToast = (msg: string) => {
     setToast(msg);
@@ -554,7 +569,9 @@ export default function ColosseumRoom001Page() {
       setQueue(prev => [...prev, newItem]);
       addSysMsg(`🎵 "${songTitle}" 신청이 접수되었습니다`);
     }
+    // 자신은 로컬 추가, 상대방은 Daily app-message로 전달
     sendRealtimeMessage(text, "chat");
+    sendAppMessage({ _type: "chat", text, msgType: "chat", nickname: nicknameForBroadcast });
     setChatInput("");
   };
 

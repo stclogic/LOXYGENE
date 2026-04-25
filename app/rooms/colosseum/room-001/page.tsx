@@ -30,6 +30,7 @@ import { useVoiceScoring } from "@/lib/scoring/useVoiceScoring";
 import { hasNickname, getUserNickname, setUserNickname, randomNickname } from "@/lib/utils/userSession";
 import { envConfig } from "@/lib/utils/envCheck";
 import { useDailyBroadcast } from "@/hooks/useDailyBroadcast";
+import { useRealtimeChat } from "@/lib/supabase/useRealtimeChat";
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 const SONG_TITLE = "안동역에서";
@@ -154,10 +155,23 @@ export default function ColosseumRoom001Page() {
   // Panel tabs
   const [activeTab, setActiveTab] = useState<"chat" | "queue">("chat");
 
-  // Chat
-  const [messages, setMessages] = useState<ChatMessage[]>(INIT_MESSAGES);
+  // Chat — Supabase Realtime
+  const {
+    messages: realtimeMessages,
+    sendMessage: sendRealtimeMessage,
+    isConnected: chatConnected,
+  } = useRealtimeChat("room-001");
   const [chatInput, setChatInput] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Realtime 메시지를 로컬 ChatMessage 형식으로 변환
+  const messages: ChatMessage[] = realtimeMessages.map(m => ({
+    id: m.id,
+    type: m.type === "chat" ? "user" : m.type as ChatMessage["type"],
+    nickname: m.nickname,
+    text: m.text,
+    timestamp: m.timestamp ? new Date(m.timestamp).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" }) : undefined,
+  }));
 
   // Search
   const [searchQuery, setSearchQuery] = useState("");
@@ -308,11 +322,10 @@ export default function ColosseumRoom001Page() {
     setLastGift(isChamp ? "🍾 샴페인 전송!" : "💐 꽃다발 전송!");
     setLastGiftType(gType);
     reactionsRef.current?.trigger(isChamp ? "🥂" : "🌸", 6);
-    setMessages(prev => [...prev, {
-      id: `gift-${Date.now()}`,
-      type: isChamp ? "gift_champagne" : "gift_bouquet",
-      text: isChamp ? `${MY_NICKNAME}님이 샴페인을 선물했습니다! 🥂` : `${MY_NICKNAME}님이 꽃다발을 선물했습니다! 🌸`,
-    }]);
+    sendRealtimeMessage(
+      isChamp ? `${MY_NICKNAME}님이 샴페인을 선물했습니다! 🥂` : `${MY_NICKNAME}님이 꽃다발을 선물했습니다! 🌸`,
+      isChamp ? "gift_champagne" : "gift_bouquet"
+    );
     const t = setTimeout(() => { setLastGift(null); setLastGiftType(null); }, 2000);
     return () => clearTimeout(t);
   }, [gifts]);
@@ -388,7 +401,7 @@ export default function ColosseumRoom001Page() {
 
   // ── Helpers ────────────────────────────────────────────────────────────────
   const addSysMsg = (text: string) =>
-    setMessages(prev => [...prev, { id: `sys-${Date.now()}`, type: "system", text }]);
+    sendRealtimeMessage(text, "system");
 
   const showToast = (msg: string) => {
     setToast(msg);
@@ -434,7 +447,7 @@ export default function ColosseumRoom001Page() {
       setQueue(prev => [...prev, newItem]);
       addSysMsg(`🎵 "${songTitle}" 신청이 접수되었습니다`);
     }
-    setMessages(prev => [...prev, { id: `msg-${Date.now()}`, type: "user", nickname: MY_NICKNAME, text, timestamp: getTs() }]);
+    sendRealtimeMessage(text, "chat");
     setChatInput("");
   };
 

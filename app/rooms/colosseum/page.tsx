@@ -16,9 +16,13 @@ const HomeButton = () => (
   </Link>
 );
 
-const MOCK_ROOMS = [
+// DB에서 만들어진 실제 방이 없을 때 초기 표시용 — 비어있으면 빈 배열로 시작
+const INITIAL_ROOMS: RoomItem[] = [];
+
+// 항상 리스트 하단에 고정 노출되는 샘플 방 (삭제 불가)
+const SAMPLE_ROOMS: RoomItem[] = [
   {
-    id: "room-001",
+    id: "sample-001",
     title: "90년대 감성 파티 🎵",
     hostName: "별빛가수",
     hostAvatar: "🌟",
@@ -28,9 +32,10 @@ const MOCK_ROOMS = [
     tags: ["#파티", "#90년대", "#감성"],
     vibe: "🎉 신나는",
     isLive: true,
+    isSample: true,
   },
   {
-    id: "room-002",
+    id: "sample-002",
     title: "K-POP 파티 나이트 🎤",
     hostName: "노래왕자",
     hostAvatar: "👑",
@@ -40,9 +45,10 @@ const MOCK_ROOMS = [
     tags: ["#파티", "#KPOP", "#댄스"],
     vibe: "🔥 열정적",
     isLive: true,
+    isSample: true,
   },
   {
-    id: "room-003",
+    id: "sample-003",
     title: "트로트 칵테일파티 🌟",
     hostName: "달빛선율",
     hostAvatar: "🌙",
@@ -52,9 +58,10 @@ const MOCK_ROOMS = [
     tags: ["#칵테일파티", "#트로트"],
     vibe: "😊 편안함",
     isLive: true,
+    isSample: true,
   },
   {
-    id: "room-004",
+    id: "sample-004",
     title: "인디 하우스파티 🎸",
     hostName: "가을바람",
     hostAvatar: "🍂",
@@ -64,9 +71,10 @@ const MOCK_ROOMS = [
     tags: ["#하우스파티", "#인디", "#감성"],
     vibe: "😊 편안함",
     isLive: true,
+    isSample: true,
   },
   {
-    id: "room-005",
+    id: "sample-005",
     title: "재즈 나이트 파티 🎷",
     hostName: "봄날의꿈",
     hostAvatar: "🌸",
@@ -76,9 +84,10 @@ const MOCK_ROOMS = [
     tags: ["#나이트파티", "#재즈"],
     vibe: "🎉 신나는",
     isLive: true,
+    isSample: true,
   },
   {
-    id: "room-006",
+    id: "sample-006",
     title: "힙합 크루 파티 🔥",
     hostName: "여름밤",
     hostAvatar: "🌊",
@@ -88,8 +97,23 @@ const MOCK_ROOMS = [
     tags: ["#크루파티", "#힙합", "#사이퍼"],
     vibe: "🔥 열정적",
     isLive: false,
+    isSample: true,
   },
 ];
+
+interface RoomItem {
+  id: string;
+  title: string;
+  hostName: string;
+  hostAvatar: string;
+  participantCount: number;
+  viewerCount: number;
+  topGiftAmount: number;
+  tags: string[];
+  vibe: string;
+  isLive: boolean;
+  isSample?: boolean;
+}
 
 interface CreateRoomForm {
   title: string;
@@ -109,7 +133,7 @@ export default function ColosseumLobbyPage() {
     hasPassword: false,
     password: "",
   });
-  const [rooms, setRooms] = useState(MOCK_ROOMS);
+  const [rooms, setRooms] = useState<RoomItem[]>([...INITIAL_ROOMS, ...SAMPLE_ROOMS]);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState("");
 
@@ -118,9 +142,8 @@ export default function ColosseumLobbyPage() {
       .then((r) => r.json())
       .then((data) => {
         if (!Array.isArray(data.rooms)) return;
-        if (data.rooms.length === 0) { setRooms([]); return; }
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const normalized = data.rooms.map((r: any) => ({
+        const normalized: RoomItem[] = data.rooms.map((r: any) => ({
           id: r.id,
           title: r.title ?? "무제",
           hostName: r.host?.nickname ?? r.host_id?.slice(0, 8) ?? "호스트",
@@ -132,7 +155,8 @@ export default function ColosseumLobbyPage() {
           vibe: "🎉 파티",
           isLive: r.status === "live",
         }));
-        setRooms(normalized);
+        // 실제 방 뒤에 샘플 방을 항상 append (샘플은 삭제 불가)
+        setRooms([...normalized, ...SAMPLE_ROOMS]);
       })
       .catch(() => {});
   };
@@ -258,7 +282,16 @@ export default function ColosseumLobbyPage() {
             </div>
           )}
           {rooms.map((room) => (
-            <GlassCard key={room.id} className="p-5 flex flex-col gap-3 hover:border-white/10 transition-all duration-300 group">
+            <GlassCard key={room.id} className={`p-5 flex flex-col gap-3 transition-all duration-300 group ${room.isSample ? "opacity-70" : "hover:border-white/10"}`}>
+              {/* 샘플 방 구분선 — 첫 샘플에만 표시 */}
+              {room.isSample && room.id === SAMPLE_ROOMS[0].id && (
+                <div className="-mx-5 -mt-5 mb-1 px-5 py-2 flex items-center gap-2"
+                  style={{ background: "rgba(255,255,255,0.02)", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+                  <div className="flex-1 h-px" style={{ background: "rgba(255,255,255,0.06)" }} />
+                  <span className="text-[9px] font-bold tracking-widest text-white/20">샘플 방 목록</span>
+                  <div className="flex-1 h-px" style={{ background: "rgba(255,255,255,0.06)" }} />
+                </div>
+              )}
               {/* Host + LIVE badge */}
               <div className="flex items-start gap-3">
                 <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl flex-shrink-0"
@@ -276,6 +309,12 @@ export default function ColosseumLobbyPage() {
                       <span className="text-[10px] px-2 py-0.5 rounded-full text-white/25"
                         style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
                         예정
+                      </span>
+                    )}
+                    {room.isSample && (
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded tracking-widest"
+                        style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.3)" }}>
+                        SAMPLE
                       </span>
                     )}
                     <span className="text-[10px] text-white/35 truncate">{room.vibe}</span>
@@ -316,12 +355,27 @@ export default function ColosseumLobbyPage() {
 
               {/* Action buttons */}
               <div className="flex gap-2 mt-auto pt-1">
-                <Link href={room.id === "room-001" ? "/rooms/colosseum/room-001" : `/rooms/colosseum/${room.id}`} className="flex-1">
-                  <NeonButton variant="cyan" size="sm" fullWidth>파티 입장</NeonButton>
-                </Link>
-                <Link href={room.id === "room-001" ? "/rooms/colosseum/room-001" : `/rooms/colosseum/${room.id}?spectate=true`} className="flex-1">
-                  <NeonButton variant="ghost" size="sm" fullWidth>관전</NeonButton>
-                </Link>
+                {room.isSample ? (
+                  <>
+                    <div className="flex-1 py-2 rounded text-xs font-medium text-center text-white/20 cursor-not-allowed select-none"
+                      style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}>
+                      파티 입장
+                    </div>
+                    <div className="flex-1 py-2 rounded text-xs font-medium text-center text-white/20 cursor-not-allowed select-none"
+                      style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}>
+                      관전
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <Link href={room.id === "room-001" ? "/rooms/colosseum/room-001" : `/rooms/colosseum/${room.id}`} className="flex-1">
+                      <NeonButton variant="cyan" size="sm" fullWidth>파티 입장</NeonButton>
+                    </Link>
+                    <Link href={room.id === "room-001" ? "/rooms/colosseum/room-001" : `/rooms/colosseum/${room.id}?spectate=true`} className="flex-1">
+                      <NeonButton variant="ghost" size="sm" fullWidth>관전</NeonButton>
+                    </Link>
+                  </>
+                )}
               </div>
             </GlassCard>
           ))}

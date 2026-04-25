@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { Icon } from "@iconify/react";
 import Link from "next/link";
@@ -113,6 +114,8 @@ const nickColor = (nick: string) => {
 
 // ── Component ──────────────────────────────────────────────────────────────────
 export default function ColosseumRoom001Page() {
+  const router = useRouter();
+
   // Role
   const [isHost, setIsHost] = useState(false); // API 응답 전까지 게스트로 시작
 
@@ -382,17 +385,31 @@ export default function ColosseumRoom001Page() {
       setSecondsLeft(prev => {
         if (prev <= 1) {
           clearInterval(countdownRef.current!);
-          setBroadcastEnded(true);
-          if (isHost) localStorage.removeItem(KEY);
+          endBroadcast(isHost);
           return 0;
         }
         return prev - 1;
       });
     }, 1000);
     return () => { if (countdownRef.current) clearInterval(countdownRef.current); };
-  // isHost가 확정된 뒤(API 응답 후) 실행되어야 함
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isHost]);
+
+  // ── 방송 종료 공통 처리 ───────────────────────────────────────────────────
+  const endBroadcast = useCallback((hostMode: boolean) => {
+    if (countdownRef.current) clearInterval(countdownRef.current);
+    localStorage.removeItem("colosseum-broadcast-start");
+    setBroadcastEnded(true);
+    if (hostMode) {
+      // Daily 방 삭제 후 홈으로
+      fetch("/api/rooms/colosseum/end-broadcast", { method: "POST" })
+        .catch(() => {})
+        .finally(() => setTimeout(() => router.push("/"), 2000));
+    } else {
+      // 게스트: 3초 후 홈으로
+      setTimeout(() => router.push("/"), 3000);
+    }
+  }, [router]);
 
   // ── Cleanup ────────────────────────────────────────────────────────────────
   useEffect(() => () => {
@@ -699,6 +716,20 @@ export default function ColosseumRoom001Page() {
             <Icon icon="solar:user-bold" className="text-white/40 w-4 h-4" />
             <span className="text-white/60 text-sm">{joined ? guestCount : 127}</span>
           </div>
+
+          {/* 호스트 방송 종료 버튼 */}
+          {isHost && (
+            <button
+              type="button"
+              title="방송 종료"
+              onClick={() => endBroadcast(true)}
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition-all hover:opacity-80 active:scale-95"
+              style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.3)", color: "#ef4444" }}
+            >
+              <Icon icon="solar:stop-bold" className="w-3.5 h-3.5" />
+              방송종료
+            </button>
+          )}
 
           {/* 호스트 마이크 토글 (Daily 연결 후 표시) */}
           {isHost && joined && (
@@ -1286,13 +1317,15 @@ export default function ColosseumRoom001Page() {
             <span className="text-6xl">📺</span>
             <div>
               <h2 className="text-white font-black text-2xl">방송이 종료되었습니다</h2>
-              <p className="text-white/40 text-sm mt-2">2시간 방송이 완료되었습니다. 시청해 주셔서 감사합니다!</p>
+              <p className="text-white/40 text-sm mt-2">시청해 주셔서 감사합니다! 잠시 후 홈으로 이동합니다.</p>
             </div>
-            <Link href="/rooms/colosseum"
+            <button
+              type="button"
+              onClick={() => router.push("/")}
               className="px-6 py-3 rounded-xl font-bold text-sm transition-all hover:scale-105"
               style={{ background: "rgba(0,229,255,0.12)", border: "1px solid rgba(0,229,255,0.4)", color: "#00E5FF" }}>
-              로비로 돌아가기
-            </Link>
+              홈으로 돌아가기
+            </button>
           </div>
         </div>
       )}

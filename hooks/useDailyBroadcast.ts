@@ -59,9 +59,11 @@ export function useDailyBroadcast({
       if (destroyed) return;
       const DailyIframe = mod.default;
 
+      // 호스트·게스트 모두 audioSource:true로 오디오 엔진 초기화
+      // → 게스트는 join 직후 즉시 뮤트하여 마이크는 막지만 수신은 허용
       const call = DailyIframe.createCallObject({
-        audioSource: isHost,   // 호스트만 마이크 열기
-        videoSource: false,    // 비디오 불필요
+        audioSource: true,
+        videoSource: false,
       });
       callRef.current = call;
 
@@ -72,8 +74,12 @@ export function useDailyBroadcast({
         setError(null);
         if (e.participants) setParticipants({ ...e.participants });
         if (isHost) {
+          // 호스트: 마이크 활성화
           call.setLocalAudio(true);
           setLocalAudioOn(true);
+        } else {
+          // 게스트: 마이크 즉시 뮤트 (audioSource:true로 초기화했으므로)
+          call.setLocalAudio(false);
         }
       });
 

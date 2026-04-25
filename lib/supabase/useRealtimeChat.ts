@@ -15,7 +15,7 @@ export interface ChatMessage {
   type: MessageType;
   nickname: string;
   text: string;
-  timestamp: string; // ISO string
+  timestamp: string;
   userId?: string;
 }
 
@@ -27,96 +27,40 @@ export interface UseRealtimeChatReturn {
   isConnected: boolean;
 }
 
-// ── Mock fallback seed (used when Supabase is not configured) ─────────────────
-
-const MOCK_SEED: ChatMessage[] = [
-  { id: "m0", roomId: "room-001", type: "system",       nickname: "system",  text: "방에 입장했습니다 🎤",                timestamp: new Date(Date.now() - 120000).toISOString() },
-  { id: "m1", roomId: "room-001", type: "chat",         nickname: "김민준",  text: "안녕하세요~~",                        timestamp: new Date(Date.now() - 90000).toISOString()  },
-  { id: "m2", roomId: "room-001", type: "chat",         nickname: "이지현",  text: "오늘 노래 기대돼요!",                  timestamp: new Date(Date.now() - 60000).toISOString()  },
-  { id: "m3", roomId: "room-001", type: "gift_bouquet", nickname: "박서준",  text: "박서준님이 꽃다발을 선물했습니다! 🌸", timestamp: new Date(Date.now() - 30000).toISOString()  },
-];
-
-// ── Load recent messages from Supabase ────────────────────────────────────────
-
-async function loadRecentMessages(
-  roomId: string,
-  limit = 50
-): Promise<ChatMessage[]> {
-  if (!isSupabaseConfigured) return [];
-  const { data, error } = await supabase
-    .from("messages")
-    .select("*")
-    .eq("room_id", roomId)
-    .order("created_at", { ascending: true })
-    .limit(limit);
-
-  if (error || !data) return [];
-
-  return data.map((row: Record<string, unknown>) => ({
-    id: String(row.id ?? Date.now()),
-    roomId: String(row.room_id ?? roomId),
-    type: (row.type as MessageType) ?? "chat",
-    nickname: String(row.nickname ?? ""),
-    text: String(row.content ?? row.text ?? ""),
-    timestamp: String(row.created_at ?? new Date().toISOString()),
-    userId: row.user_id ? String(row.user_id) : undefined,
-  }));
-}
-
-// ── Hook ──────────────────────────────────────────────────────────────────────
+// ── Hook — Supabase Broadcast 방식 (DB publication 불필요) ────────────────────
 
 export function useRealtimeChat(
   initialRoomId?: string
 ): UseRealtimeChatReturn {
-  const [messages, setMessages] = useState<ChatMessage[]>(MOCK_SEED);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isConnected, setIsConnected] = useState(false);
   const channelRef = useRef<RealtimeChannel | null>(null);
   const roomIdRef = useRef<string>(initialRoomId ?? "");
 
-  const addMessage = (msg: ChatMessage) =>
-    setMessages(prev => [...prev, msg]);
+  const addMessage = useCallback((msg: ChatMessage) =>
+    setMessages(prev => [...prev, msg]), []);
 
-  // ── Subscribe ────────────────────────────────────────────────────────────
+  // ── Subscribe via Broadcast ──────────────────────────────────────────────
   const subscribeToChat = useCallback((roomId: string) => {
     roomIdRef.current = roomId;
+
+    // 기존 채널 정리
+    if (channelRef.current) {
+      supabase.removeChannel(channelRef.current);
+    }
 
     if (!isSupabaseConfigured) {
       setIsConnected(true);
       return;
     }
 
-    // Unsubscribe from any existing channel first
-    if (channelRef.current) {
-      supabase.removeChannel(channelRef.current);
-    }
-
-    // Fetch recent history
-    loadRecentMessages(roomId).then(history => {
-      if (history.length > 0) setMessages(history);
-    });
-
     const channel = supabase
-      .channel(`room:${roomId}`)
+      .channel(`broadcast:chat:${roomId}`)
       .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "messages",
-          filter: `room_id=eq.${roomId}`,
-        },
-        (payload) => {
-          const row = payload.new as Record<string, unknown>;
-          const msg: ChatMessage = {
-            id: String(row.id ?? Date.now()),
-            roomId: String(row.room_id ?? roomId),
-            type: (row.type as MessageType) ?? "chat",
-            nickname: String(row.nickname ?? ""),
-            text: String(row.content ?? row.text ?? ""),
-            timestamp: String(row.created_at ?? new Date().toISOString()),
-            userId: row.user_id ? String(row.user_id) : undefined,
-          };
-          addMessage(msg);
+        "broadcast",
+        { event: "message" },
+        ({ payload }) => {
+          if (payload && payload.id) addMessage(payload as ChatMessage);
         }
       )
       .subscribe((status) => {
@@ -124,7 +68,7 @@ export function useRealtimeChat(
       });
 
     channelRef.current = channel;
-  }, []);
+  }, [addMessage]);
 
   // ── Unsubscribe ──────────────────────────────────────────────────────────
   const unsubscribeFromChat = useCallback(() => {
@@ -135,15 +79,15 @@ export function useRealtimeChat(
     setIsConnected(false);
   }, []);
 
-  // ── Send message ─────────────────────────────────────────────────────────
+  // ── Send via Broadcast + optional DB persist ─────────────────────────────
   const sendMessage = useCallback(
     async (content: string, type: MessageType = "chat") => {
       const roomId = roomIdRef.current;
       const nickname = getUserNickname();
       const userId = getUserId();
 
-      const optimistic: ChatMessage = {
-        id: `local-${Date.now()}`,
+      const msg: ChatMessage = {
+        id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
         roomId,
         type,
         nickname,
@@ -152,37 +96,37 @@ export function useRealtimeChat(
         userId,
       };
 
-      // Optimistic add
-      addMessage(optimistic);
+      // Optimistic local add
+      addMessage(msg);
 
-      if (!isSupabaseConfigured) return;
+      // Broadcast to all subscribers (real-time)
+      if (channelRef.current) {
+        channelRef.current.send({
+          type: "broadcast",
+          event: "message",
+          payload: msg,
+        });
+      }
 
-      const { error } = await supabase.from("messages").insert({
-        room_id: roomId,
-        user_id: userId,
-        nickname,
-        content,
-        type,
-      });
-
-      if (error) {
-        console.error("[useRealtimeChat] sendMessage error:", error.message);
+      // Optional: persist to DB (fire-and-forget)
+      if (isSupabaseConfigured) {
+        void supabase.from("messages").insert({
+          room_id: roomId,
+          user_id: userId,
+          nickname,
+          content,
+          type,
+        });
       }
     },
-    []
+    [addMessage]
   );
 
-  // ── Auto-subscribe if initialRoomId provided ──────────────────────────────
+  // ── Auto-subscribe ───────────────────────────────────────────────────────
   useEffect(() => {
     if (initialRoomId) subscribeToChat(initialRoomId);
     return () => unsubscribeFromChat();
   }, [initialRoomId, subscribeToChat, unsubscribeFromChat]);
 
-  return {
-    messages,
-    sendMessage,
-    subscribeToChat,
-    unsubscribeFromChat,
-    isConnected,
-  };
+  return { messages, sendMessage, subscribeToChat, unsubscribeFromChat, isConnected };
 }

@@ -344,20 +344,40 @@ export default function ColosseumRoom001Page() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ── Broadcast countdown ────────────────────────────────────────────────────
+  // ── Broadcast countdown (호스트 시작시각 공유 → 게스트도 남은 시간 동기화) ──
   useEffect(() => {
+    const KEY = "colosseum-broadcast-start";
+    const TWO_HOURS = 2 * 60 * 60;
+
+    if (isHost) {
+      // 호스트: 시작시각 기록 (이미 있으면 유지)
+      if (!localStorage.getItem(KEY)) {
+        localStorage.setItem(KEY, String(Date.now()));
+      }
+    }
+
+    const startTs = Number(localStorage.getItem(KEY) ?? Date.now());
+    const elapsed = Math.floor((Date.now() - startTs) / 1000);
+    const remaining = Math.max(0, TWO_HOURS - elapsed);
+
+    if (remaining === 0) { setBroadcastEnded(true); return; }
+    setSecondsLeft(remaining);
+
     countdownRef.current = setInterval(() => {
       setSecondsLeft(prev => {
         if (prev <= 1) {
           clearInterval(countdownRef.current!);
           setBroadcastEnded(true);
+          if (isHost) localStorage.removeItem(KEY);
           return 0;
         }
         return prev - 1;
       });
     }, 1000);
     return () => { if (countdownRef.current) clearInterval(countdownRef.current); };
-  }, []);
+  // isHost가 확정된 뒤(API 응답 후) 실행되어야 함
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isHost]);
 
   // ── Cleanup ────────────────────────────────────────────────────────────────
   useEffect(() => () => {
@@ -652,17 +672,13 @@ export default function ColosseumRoom001Page() {
         </div>
         <div className="flex items-center gap-2">
           <YouTubeBackgroundPlayer videoId="ISrBAxw12bk" maxVolume={50} />
-          <button
-            onClick={() => setIsHost(h => !h)}
-            className="px-2.5 py-1 rounded-lg text-[10px] font-medium transition-all hover:opacity-80"
-            style={{
-              background: isHost ? "rgba(0,229,255,0.1)" : "rgba(255,255,255,0.05)",
-              border: isHost ? "1px solid rgba(0,229,255,0.3)" : "1px solid rgba(255,255,255,0.1)",
-              color: isHost ? "#00E5FF" : "rgba(255,255,255,0.4)",
-            }}
-          >
-            {isHost ? "👑 호스트" : "참여자"}
-          </button>
+          {/* 역할 표시 — 수동 토글 불가, API 응답으로만 결정 */}
+          {isHost && (
+            <div className="px-2.5 py-1 rounded-lg text-[10px] font-medium"
+              style={{ background: "rgba(0,229,255,0.1)", border: "1px solid rgba(0,229,255,0.3)", color: "#00E5FF" }}>
+              👑 호스트
+            </div>
+          )}
           {/* 실시간 시청자 수 (Daily 연결 시 실제값, 미연결 시 mock) */}
           <div className="flex items-center gap-1.5">
             <Icon icon="solar:user-bold" className="text-white/40 w-4 h-4" />

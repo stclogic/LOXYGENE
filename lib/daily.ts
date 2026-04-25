@@ -58,10 +58,8 @@ export async function createBroadcastToken(
         user_id: userId,
         user_name: userName,
         is_owner: isHost,
-        can_send_audio: isHost,
-        can_send_video: isHost,
-        start_audio_off: !isHost,  // 게스트는 마이크 꺼진 채로 시작
-        start_video_off: !isHost,
+        start_audio_off: !isHost,
+        start_video_off: true,       // 비디오는 항상 off
         enable_recording: false,
         exp: Math.floor(Date.now() / 1000) + 60 * 60 * 8,
       },

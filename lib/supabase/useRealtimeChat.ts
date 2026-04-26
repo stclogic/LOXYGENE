@@ -22,6 +22,7 @@ export interface ChatMessage {
 export interface UseRealtimeChatReturn {
   messages: ChatMessage[];
   sendMessage: (content: string, type?: MessageType) => Promise<void>;
+  addExternalMessage: (text: string, nickname: string, type?: MessageType) => void;
   subscribeToChat: (roomId: string) => void;
   unsubscribeFromChat: () => void;
   isConnected: boolean;
@@ -128,5 +129,17 @@ export function useRealtimeChat(
     return () => unsubscribeFromChat();
   }, [initialRoomId, subscribeToChat, unsubscribeFromChat]);
 
-  return { messages, sendMessage, subscribeToChat, unsubscribeFromChat, isConnected };
+  // 외부(Daily app-message)에서 수신한 메시지를 발신자 닉네임으로 직접 추가
+  const addExternalMessage = useCallback((text: string, nickname: string, type: MessageType = "chat") => {
+    addMessage({
+      id: `ext-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      roomId: roomIdRef.current,
+      type,
+      nickname,
+      text,
+      timestamp: new Date().toISOString(),
+    });
+  }, [addMessage]);
+
+  return { messages, sendMessage, addExternalMessage, subscribeToChat, unsubscribeFromChat, isConnected };
 }

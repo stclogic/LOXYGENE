@@ -155,9 +155,13 @@ export default function ColosseumRoom001Page() {
     const msg = data as Record<string, unknown>;
     if (!msg || typeof msg !== "object") return;
 
-    // 채팅 메시지
+    // 채팅 메시지 — 발신자 닉네임 그대로 표시
     if (msg._type === "chat") {
-      sendRealtimeMessage(String(msg.text ?? ""), (msg.msgType as "chat" | "system") ?? "chat");
+      addExternalMessage(
+        String(msg.text ?? ""),
+        String(msg.nickname ?? "게스트"),
+        (msg.msgType as "chat" | "system") ?? "chat"
+      );
       return;
     }
     // 콘텐츠 동기화 (게스트만 적용)
@@ -282,6 +286,7 @@ export default function ColosseumRoom001Page() {
   const {
     messages: realtimeMessages,
     sendMessage: sendRealtimeMessage,
+    addExternalMessage,
     isConnected: chatConnected,
   } = useRealtimeChat("room-001");
   const [chatInput, setChatInput] = useState("");
@@ -419,17 +424,28 @@ export default function ColosseumRoom001Page() {
     setUserNickname(name);
     setNicknameForBroadcast(name);
     setNicknameModalOpen(false);
+    // 닉네임 설정 후 API 호출 트리거
+    setNicknameDone(true);
   };
 
-  // ── broadcast-join: 고정 세션 THE COLOSSEUM 입장 ────────────────────────
+  // 닉네임 확정 여부 (API 호출 타이밍 제어)
+  const [nicknameDone, setNicknameDone] = useState(false);
+
   useEffect(() => {
-    const nickname = getUserNickname();
-    if (nickname) setNicknameForBroadcast(nickname);
+    // 이미 닉네임이 있으면 즉시 확정
+    if (hasNickname()) setNicknameDone(true);
+  }, []);
+
+  // ── broadcast-join: 닉네임 확정 후 호출 ───────────────────────────────────
+  useEffect(() => {
+    if (!nicknameDone) return; // 닉네임 미확정 시 대기
+    const nickname = getUserNickname() || "게스트";
+    setNicknameForBroadcast(nickname);
 
     fetch("/api/rooms/colosseum/broadcast-join", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ nickname: nickname || "게스트" }),
+      body: JSON.stringify({ nickname }),
     })
       .then(r => r.ok ? r.json() : null)
       .then(data => {
@@ -765,22 +781,32 @@ export default function ColosseumRoom001Page() {
           🎤 노래방
         </button>
       )}
-      {/* 노래방 버튼 (호스트 전용) */}
+      {/* 호스트 전용 버튼 모음 (노래방 + 배경 선택) */}
       {isHost && (
-        <button
-          type="button"
-          onClick={() => setKaraokeInputOpen(v => !v)}
-          className="fixed top-14 left-36 z-50 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all hover:scale-105 active:scale-95"
-          style={{
-            background: karaokeVideoId ? "rgba(236,72,153,0.15)" : "rgba(255,255,255,0.07)",
-            border: `1px solid ${karaokeVideoId ? "rgba(236,72,153,0.5)" : "rgba(255,255,255,0.15)"}`,
-            color: karaokeVideoId ? "#ec4899" : "rgba(255,255,255,0.6)",
-            backdropFilter: "blur(12px)",
-          }}
-        >
-          <Icon icon="solar:music-note-2-bold" className="w-3.5 h-3.5" />
-          🎤 노래방 {karaokeVideoId ? "ON" : "OFF"}
-        </button>
+        <div className="fixed top-14 left-36 z-50 flex items-center gap-2">
+          {/* 노래방 버튼 */}
+          <button type="button" onClick={() => setKaraokeInputOpen(v => !v)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all hover:scale-105 active:scale-95"
+            style={{
+              background: karaokeVideoId ? "rgba(236,72,153,0.15)" : "rgba(255,255,255,0.07)",
+              border: `1px solid ${karaokeVideoId ? "rgba(236,72,153,0.5)" : "rgba(255,255,255,0.15)"}`,
+              color: karaokeVideoId ? "#ec4899" : "rgba(255,255,255,0.6)",
+              backdropFilter: "blur(12px)",
+            }}>
+            <Icon icon="solar:music-note-2-bold" className="w-3.5 h-3.5" />
+            🎤 노래방 {karaokeVideoId ? "ON" : "OFF"}
+          </button>
+          {/* 배경 선택 버튼 */}
+          <button type="button" onClick={() => setSettingsOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all hover:scale-105 active:scale-95"
+            style={{
+              background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.15)",
+              color: "rgba(255,255,255,0.6)", backdropFilter: "blur(12px)",
+            }}>
+            <Icon icon="solar:gallery-minimalistic-bold" className="w-3.5 h-3.5" />
+            🖼️ 배경
+          </button>
+        </div>
       )}
 
       {/* 노래방 URL 입력 팝오버 (드래그 가능) */}

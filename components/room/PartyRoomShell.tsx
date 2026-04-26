@@ -177,13 +177,17 @@ export function FloatingPanel({
   defaultW = 640,
   aspectRatio = 16 / 9,
   zIndex = 6,
+  defaultX,   // 초기 X 위치 (미제공 시 화면 중앙)
+  defaultY,   // 초기 Y 위치 (미제공 시 화면 상단 1/3)
 }: {
   children: React.ReactNode;
   defaultW?: number;
   aspectRatio?: number;
   zIndex?: number;
+  defaultX?: number;
+  defaultY?: number;
 }) {
-  const [size, setSize] = useState({ w: 0, h: 0 }); // 0 = SSR / not yet mounted
+  const [size, setSize] = useState({ w: 0, h: 0 });
   const [pos,  setPos]  = useState({ x: 0, y: 0 });
   const dragging      = useRef(false);
   const dragOrigin    = useRef({ mx: 0, my: 0, px: 0, py: 0 });
@@ -191,16 +195,23 @@ export function FloatingPanel({
   const resizeOrigin  = useRef({ mx: 0, my: 0, w: 0, h: 0 });
 
   useEffect(() => {
-    const w = Math.round(Math.min(defaultW, window.innerWidth * 0.75));
+    const w = Math.round(Math.min(defaultW, window.innerWidth * 0.92));
     const h = Math.round(w / aspectRatio);
     setSize({ w, h });
     setPos({
-      x: Math.round((window.innerWidth  - w) / 2),
-      y: Math.round((window.innerHeight - h) / 3),
+      x: defaultX !== undefined ? defaultX : Math.round((window.innerWidth  - w) / 2),
+      y: defaultY !== undefined ? defaultY : Math.round((window.innerHeight - h) / 3),
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // ── 공통 이동 로직 ──────────────────────────────────────────────────────
+  const clamp = (x: number, y: number) => ({
+    x: Math.max(0, Math.min(window.innerWidth  - size.w, x)),
+    y: Math.max(0, Math.min(window.innerHeight - size.h, y)),
+  });
+
+  // Mouse drag
   const startDrag = (e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
@@ -208,14 +219,35 @@ export function FloatingPanel({
     dragOrigin.current = { mx: e.clientX, my: e.clientY, px: pos.x, py: pos.y };
     const onMove = (ev: MouseEvent) => {
       if (!dragging.current) return;
-      setPos({
-        x: Math.max(0, Math.min(window.innerWidth  - size.w, dragOrigin.current.px + ev.clientX - dragOrigin.current.mx)),
-        y: Math.max(0, Math.min(window.innerHeight - size.h, dragOrigin.current.py + ev.clientY - dragOrigin.current.my)),
-      });
+      setPos(clamp(
+        dragOrigin.current.px + ev.clientX - dragOrigin.current.mx,
+        dragOrigin.current.py + ev.clientY - dragOrigin.current.my,
+      ));
     };
     const onUp = () => { dragging.current = false; window.removeEventListener("mousemove", onMove); window.removeEventListener("mouseup", onUp); };
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
+  };
+
+  // Touch drag (태블릿/모바일)
+  const startTouchDrag = (e: React.TouchEvent) => {
+    e.stopPropagation();
+    if (e.touches.length !== 1) return;
+    const t = e.touches[0];
+    dragging.current = true;
+    dragOrigin.current = { mx: t.clientX, my: t.clientY, px: pos.x, py: pos.y };
+    const onMove = (ev: TouchEvent) => {
+      if (!dragging.current || ev.touches.length !== 1) return;
+      ev.preventDefault(); // 페이지 스크롤 방지
+      const tc = ev.touches[0];
+      setPos(clamp(
+        dragOrigin.current.px + tc.clientX - dragOrigin.current.mx,
+        dragOrigin.current.py + tc.clientY - dragOrigin.current.my,
+      ));
+    };
+    const onEnd = () => { dragging.current = false; window.removeEventListener("touchmove", onMove); window.removeEventListener("touchend", onEnd); };
+    window.addEventListener("touchmove", onMove, { passive: false });
+    window.addEventListener("touchend", onEnd);
   };
 
   const startResize = (e: React.MouseEvent) => {
@@ -252,6 +284,7 @@ export function FloatingPanel({
         className="absolute top-0 left-0 right-0 h-8 flex items-center px-2.5 cursor-move select-none"
         style={{ background: "linear-gradient(to bottom, rgba(0,0,0,0.6) 0%, transparent 100%)" }}
         onMouseDown={startDrag}
+        onTouchStart={startTouchDrag}
       >
         <Icon icon="solar:hamburger-menu-bold" className="w-3 h-3 text-white/40 pointer-events-none" />
       </div>

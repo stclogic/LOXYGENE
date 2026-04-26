@@ -1366,9 +1366,11 @@ export default function ColosseumRoom001Page() {
         </div>
       )}
 
-      {/* ── 호스트 자기 화면 (로컬 카메라 미리보기) ── */}
+      {/* ── 호스트 자기 화면 (우측 상단 고정) ── */}
       {isHost && (
-        <FloatingPanel defaultW={280} aspectRatio={16 / 9} zIndex={55}>
+        <FloatingPanel defaultW={280} aspectRatio={16 / 9} zIndex={55}
+          defaultX={typeof window !== "undefined" ? Math.max(0, window.innerWidth - 300) : 900}
+          defaultY={80}>
           {hostStream ? (
             <video ref={hostVideoRef} autoPlay muted playsInline
               className="absolute inset-0 w-full h-full object-cover" />
@@ -1382,9 +1384,10 @@ export default function ColosseumRoom001Page() {
         </FloatingPanel>
       )}
 
-      {/* ── 게스트 화면: 호스트 Daily 비디오 (실시간 방송) ── */}
+      {/* ── 게스트 화면: 호스트 Daily 비디오 (좌상단 배치) ── */}
       {!isHost && joined && (
-        <FloatingPanel defaultW={680} aspectRatio={16 / 9} zIndex={55}>
+        <FloatingPanel defaultW={480} aspectRatio={16 / 9} zIndex={55}
+          defaultX={16} defaultY={80}>
           {hostVideoTrack ? (
             <video ref={remoteVideoRef} autoPlay playsInline
               className="absolute inset-0 w-full h-full object-cover" />
@@ -1405,8 +1408,9 @@ export default function ColosseumRoom001Page() {
       {/* ── BGM (YouTubeBackgroundPlayer — 버튼 + 이퀄라이저 포함) ── */}
       {/* 버튼은 헤더 우측에 렌더링, 여기선 플레이어만 마운트 */}
 
-      {/* ── 메인 무대 영상 패널 ── */}
-      <FloatingPanel defaultW={680} aspectRatio={16 / 9} zIndex={60}>
+      {/* ── 메인 무대 영상 패널 (호스트: 좌상단, 게스트는 Daily 패널과 겹치지 않게 우측) ── */}
+      <FloatingPanel defaultW={520} aspectRatio={16 / 9} zIndex={60}
+        defaultX={isHost ? 16 : 520} defaultY={80}>
         {mainVideoPlaying ? (
           <iframe
             key={`main-${mainVideoId}`}
@@ -1472,7 +1476,8 @@ export default function ColosseumRoom001Page() {
 
       {/* ── 노래방 플로팅 패널 (사용자 URL 입력) ── */}
       {karaokeVideoId && (
-        <FloatingPanel key={karaokeVideoId} defaultW={640} aspectRatio={16 / 9} zIndex={65}>
+        <FloatingPanel key={karaokeVideoId} defaultW={480} aspectRatio={16 / 9} zIndex={65}
+          defaultX={16} defaultY={360}>
           <iframe
             title="노래방 유튜브"
             src={`https://www.youtube.com/embed/${karaokeVideoId}?rel=0&modestbranding=1&autoplay=1`}

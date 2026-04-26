@@ -31,6 +31,7 @@ import { useVoiceScoring } from "@/lib/scoring/useVoiceScoring";
 import { hasNickname, getUserNickname, setUserNickname, randomNickname } from "@/lib/utils/userSession";
 import { envConfig } from "@/lib/utils/envCheck";
 import { useDailyBroadcast } from "@/hooks/useDailyBroadcast";
+import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { useRealtimeChat } from "@/lib/supabase/useRealtimeChat";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase/supabaseClient";
 
@@ -141,14 +142,15 @@ export default function ColosseumRoom001Page() {
   const router = useRouter();
 
   // Role
-  const [isHost, setIsHost] = useState(false); // API 응답 전까지 게스트로 시작
+  const [isHost, setIsHost] = useState(false);
+  const adminDetected = useIsAdmin(); // NextAuth 세션으로 super admin 여부 확인
 
   // ── Daily.co 단방향 방송 ───────────────────────────────────────────────────
   const [broadcastRoomUrl, setBroadcastRoomUrl] = useState("");
   const [broadcastToken, setBroadcastToken]   = useState<string | null>(null);
   const [broadcastRole, setBroadcastRole]     = useState<"host" | "guest">("guest");
   const [nicknameForBroadcast, setNicknameForBroadcast] = useState("게스트");
-  const [broadcastReady, setBroadcastReady]   = useState(false); // API 완료 후 true
+  const [broadcastReady, setBroadcastReady]   = useState(false);
 
   // ── Daily app-message 수신 핸들러 (채팅·타이머·콘텐츠 동기화) ─────────────
   const handleAppMessage = useCallback((data: unknown) => {
@@ -437,28 +439,36 @@ export default function ColosseumRoom001Page() {
   }, []);
 
   // ── broadcast-join: 닉네임 확정 후 호출 ───────────────────────────────────
-  useEffect(() => {
-    if (!nicknameDone) return; // 닉네임 미확정 시 대기
+  const doBroadcastJoin = useCallback(async () => {
     const nickname = getUserNickname() || "게스트";
     setNicknameForBroadcast(nickname);
-
-    fetch("/api/rooms/colosseum/broadcast-join", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ nickname }),
-    })
-      .then(r => r.ok ? r.json() : null)
-      .then(data => {
-        if (!data || !data.roomUrl || !data.token) return;
-        // 모든 값을 한 번에 설정 후 ready = true (React 18 자동 배치)
-        setBroadcastRoomUrl(data.roomUrl);
-        setBroadcastToken(data.token);
-        setBroadcastRole(data.role ?? "guest");
-        setIsHost(data.role === "host");
-        setBroadcastReady(true); // ← 이 시점에 useDailyBroadcast join 시작
-      })
-      .catch(console.error);
+    try {
+      const r = await fetch("/api/rooms/colosseum/broadcast-join", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nickname }),
+      });
+      const data = r.ok ? await r.json() : null;
+      if (!data || !data.roomUrl || !data.token) return;
+      setBroadcastRoomUrl(data.roomUrl);
+      setBroadcastToken(data.token);
+      setBroadcastRole(data.role ?? "guest");
+      setIsHost(data.role === "host");
+      setBroadcastReady(true);
+    } catch { console.error("broadcast-join failed"); }
   }, []);
+
+  useEffect(() => {
+    if (!nicknameDone) return;
+    doBroadcastJoin();
+  }, [nicknameDone, doBroadcastJoin]);
+
+  // admin 감지 시 호스트 토큰 재요청 (Google 로그인 후 세션 확정되면 자동 업그레이드)
+  useEffect(() => {
+    if (adminDetected && broadcastRole === "guest" && nicknameDone) {
+      doBroadcastJoin();
+    }
+  }, [adminDetected, broadcastRole, nicknameDone, doBroadcastJoin]);
 
   const gifts = useRoomStore((s) => s.gifts);
 
@@ -912,12 +922,19 @@ export default function ColosseumRoom001Page() {
         </div>
         <div className="flex items-center gap-2">
           <YouTubeBackgroundPlayer videoId="ISrBAxw12bk" maxVolume={50} />
-          {/* 역할 표시 — 수동 토글 불가, API 응답으로만 결정 */}
-          {isHost && (
+          {/* 역할 표시 */}
+          {isHost ? (
             <div className="px-2.5 py-1 rounded-lg text-[10px] font-medium"
               style={{ background: "rgba(0,229,255,0.1)", border: "1px solid rgba(0,229,255,0.3)", color: "#00E5FF" }}>
               👑 호스트
             </div>
+          ) : !adminDetected && (
+            // 로그인하지 않은 경우 호스트 로그인 안내
+            <a href="/auth/login?callbackUrl=/rooms/colosseum/room-001"
+              className="px-2.5 py-1 rounded-lg text-[10px] font-medium transition-all hover:opacity-80"
+              style={{ background: "rgba(255,215,0,0.08)", border: "1px solid rgba(255,215,0,0.25)", color: "rgba(255,215,0,0.8)" }}>
+              🔑 호스트 로그인
+            </a>
           )}
           {/* 실시간 시청자 수 (Daily 연결 시 실제값, 미연결 시 mock) */}
           <div className="flex items-center gap-1.5">

@@ -113,6 +113,29 @@ const nickColor = (nick: string) => {
   return c[Math.abs(h) % c.length];
 };
 
+// ── 배경 옵션 ──────────────────────────────────────────────────────────────────
+const ROOM_BG_OPTIONS = [
+  { id: "dark",      label: "🌑 기본 다크",  gradient: "radial-gradient(ellipse at center, rgba(0,229,255,0.04) 0%, #070707 70%)", premium: false },
+  { id: "city",      label: "🌃 도시야경",   gradient: "linear-gradient(135deg,#0f0c29,#302b63,#24243e)", premium: false },
+  { id: "space",     label: "🌌 우주파티",   gradient: "linear-gradient(135deg,#0f0c29,#302b63,#000000)", premium: false },
+  {
+    id: "premium-1", label: "✨ 프리미엄 1",
+    image: "https://blogger.googleusercontent.com/img/a/AVvXsEhTk7WuLOMkMHHKuX-IPA1ic6FXYH4czFNVhqRcKtbS1Wlkp5tg2jpMUKIs6a2Ju7RhknLzK5V7XipSOWPMMVOi6FyW62UlRZJzjYZ8NvIKfnAcMwJHSNVEMFHCAOxq2pgAj9UHxfAcPYwNGVJmHI9-xY6G6b5UCVOkY3WyRKH1TjhXlcIaT5mwqqhhHEs",
+    premium: true,
+  },
+  {
+    id: "premium-2", label: "✨ 프리미엄 2",
+    image: "https://blogger.googleusercontent.com/img/a/AVvXsEg077Ew0Ol_z-dgXytQAuMtD-21etHa-f-TLheUTxlyQjVnE9vvyDUHvy-BEaeYsFfwnIEzImcPGJEpzfOHiywhI3vRl6sGxMbOsdI-ud7AymyQ3fjt3ZOuQHWu6oYNesaqy1Ul50WK1s3vlRWTlQH6YpcDyHPwwcBnfboYYDnKqffW9-krh6zvDSM318o",
+    premium: true,
+  },
+  {
+    id: "premium-3", label: "✨ 프리미엄 3",
+    image: "https://blogger.googleusercontent.com/img/a/AVvXsEgnqrvLVVyAgqkWmGRK17DRvHZWfYUvIWaYqrBseJyyA_vS07ixzkjWCHDjskb8dRpNw-gu_P13oPsOTGkQaXyDmBIkqeLNmL-dlMk0rj27KOSbU7CRYFXd9UJ2Im50wX8LYwNkY5RPX-sDWvPVYng65peK-z3VsI5XdTi3RdN1QOICbJD7F8wBpwVHWJE",
+    premium: true,
+  },
+] as const;
+type RoomBg = typeof ROOM_BG_OPTIONS[number];
+
 // ── Component ──────────────────────────────────────────────────────────────────
 export default function ColosseumRoom001Page() {
   const router = useRouter();
@@ -232,10 +255,18 @@ export default function ColosseumRoom001Page() {
   const [hostStream, setHostStream] = useState<MediaStream | null>(null);
   const hostVideoRef = useRef<HTMLVideoElement>(null);
 
-  // 설정 팝업 + 볼륨
+  // 설정 팝업 + 볼륨 + 배경
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [speakerVol, setSpeakerVol] = useState(80); // 0-100
-  const [micVol, setMicVol]         = useState(80); // 0-100 (Daily.co mic gain)
+  const [speakerVol, setSpeakerVol] = useState(80);
+  const [micVol, setMicVol]         = useState(80);
+  const [selectedBg, setSelectedBg] = useState<RoomBg>(ROOM_BG_OPTIONS[0]);
+  // 마스터키 접속자 = isVVIPMember (localStorage)
+  const [canUsePremiumBg, setCanUsePremiumBg] = useState(false);
+  useEffect(() => {
+    setCanUsePremiumBg(
+      localStorage.getItem("isVVIPMember") === "true" || isHost
+    );
+  }, [isHost]);
 
   // 볼륨 변경 → 오디오 엘리먼트 즉시 반영
   useEffect(() => {
@@ -672,6 +703,19 @@ export default function ColosseumRoom001Page() {
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className="flex flex-col bg-[#070707] min-h-screen lg:h-screen lg:overflow-hidden relative overflow-x-hidden">
+
+      {/* 선택된 배경 이미지 레이어 */}
+      {"image" in selectedBg && selectedBg.image ? (
+        <div className="fixed inset-0 z-0 pointer-events-none"
+          style={{
+            backgroundImage: `url('${selectedBg.image}')`,
+            backgroundSize: "cover", backgroundPosition: "center",
+            backgroundColor: "rgba(4,4,10,0.75)", backgroundBlendMode: "luminosity",
+          }} />
+      ) : "gradient" in selectedBg && selectedBg.gradient ? (
+        <div className="fixed inset-0 z-0 pointer-events-none"
+          style={{ background: selectedBg.gradient, opacity: 0.8 }} />
+      ) : null}
 
       {/* Background effects layer */}
       <ReactiveBackground
@@ -1587,6 +1631,39 @@ export default function ColosseumRoom001Page() {
                   </div>
                 </div>
               )}
+
+              {/* 배경 선택 */}
+              <div className="flex flex-col gap-2">
+                <span className="text-xs font-medium text-white/60">🖼️ 배경 선택</span>
+                <div className="grid grid-cols-3 gap-2">
+                  {ROOM_BG_OPTIONS.map(bg => {
+                    const locked = bg.premium && !canUsePremiumBg;
+                    const isActive = selectedBg.id === bg.id;
+                    return (
+                      <button key={bg.id} type="button"
+                        onClick={() => { if (!locked) setSelectedBg(bg as RoomBg); }}
+                        className="relative h-14 rounded-xl overflow-hidden flex items-end p-1.5 transition-all"
+                        style={{
+                          ...("image" in bg && bg.image
+                            ? { backgroundImage: `url('${bg.image}')`, backgroundSize: "cover", backgroundPosition: "center", backgroundColor: "rgba(4,4,10,0.6)", backgroundBlendMode: "luminosity" }
+                            : { background: (bg as { gradient?: string }).gradient ?? "#070707" }),
+                          outline: isActive ? "2px solid #00E5FF" : "none",
+                          outlineOffset: 2,
+                          opacity: locked ? 0.5 : 1,
+                          cursor: locked ? "not-allowed" : "pointer",
+                        }}>
+                        <span className="text-[9px] font-bold text-white drop-shadow-lg leading-tight">{bg.label}</span>
+                        {locked && (
+                          <span className="absolute inset-0 flex items-center justify-center text-lg">🔒</span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+                {!canUsePremiumBg && (
+                  <p className="text-[10px] text-white/30">🔒 프리미엄 배경은 유료 멤버(마스터키) 전용입니다</p>
+                )}
+              </div>
 
               {/* 마이크 ON/OFF 퀵 토글 (호스트 전용) */}
               {isHost && joined && (

@@ -139,6 +139,7 @@ export default function ColosseumRoom001Page() {
     }
     // 콘텐츠 동기화 (게스트만 적용)
     if (msg._type === "content" && !isHost) {
+      if (msg.mainVideoId      !== undefined) { setMainVideoId(String(msg.mainVideoId)); setMainVideoPlaying(false); }
       if (msg.mainVideoPlaying !== undefined) setMainVideoPlaying(Boolean(msg.mainVideoPlaying));
       if (msg.karaokeVideoId   !== undefined) setKaraokeVideoId(msg.karaokeVideoId as string | null);
       if (msg.karaokeLyrics    !== undefined) setKaraokeLyrics(msg.karaokeLyrics as string[]);
@@ -331,8 +332,10 @@ export default function ColosseumRoom001Page() {
   };
 
   // ── 메인 무대 영상 (기본 정지) ──────────────────────────────────────────────
-  const MAIN_VIDEO_ID = "joCz5tmXAcI";
+  const [mainVideoId, setMainVideoId] = useState("joCz5tmXAcI"); // 호스트가 변경 가능
   const [mainVideoPlaying, setMainVideoPlaying] = useState(false);
+  const [mainVideoInput, setMainVideoInput] = useState("");
+  const [mainVideoInputOpen, setMainVideoInputOpen] = useState(false);
 
   // ── 노래방 플로팅 패널 ────────────────────────────────────────────────────
   const [karaokeVideoId, setKaraokeVideoId] = useState<string | null>(null);
@@ -1402,28 +1405,64 @@ export default function ColosseumRoom001Page() {
       {/* ── BGM (YouTubeBackgroundPlayer — 버튼 + 이퀄라이저 포함) ── */}
       {/* 버튼은 헤더 우측에 렌더링, 여기선 플레이어만 마운트 */}
 
-      {/* ── 메인 무대 영상 패널 (기본 정지, 재생 버튼 클릭 시 소리 활성화) ── */}
+      {/* ── 메인 무대 영상 패널 ── */}
       <FloatingPanel defaultW={680} aspectRatio={16 / 9} zIndex={60}>
         {mainVideoPlaying ? (
           <iframe
-            key="main-playing"
+            key={`main-${mainVideoId}`}
             title="메인 무대"
-            src={`https://www.youtube.com/embed/${MAIN_VIDEO_ID}?rel=0&modestbranding=1&autoplay=1`}
+            src={`https://www.youtube.com/embed/${mainVideoId}?rel=0&modestbranding=1&autoplay=1`}
             allow="autoplay; encrypted-media; fullscreen"
             allowFullScreen
             className="absolute inset-0 w-full h-full border-0"
           />
         ) : (
           <div className="absolute inset-0 flex items-center justify-center"
-            style={{ backgroundImage: `url(https://img.youtube.com/vi/${MAIN_VIDEO_ID}/maxresdefault.jpg)`, backgroundSize: "cover", backgroundPosition: "center" }}>
+            style={{ backgroundImage: `url(https://img.youtube.com/vi/${mainVideoId}/maxresdefault.jpg)`, backgroundSize: "cover", backgroundPosition: "center" }}>
             <div className="absolute inset-0" style={{ background: "rgba(0,0,0,0.45)" }} />
-            <button
-              type="button"
+            {/* 호스트: URL 변경 버튼 */}
+            {isHost && (
+              <button type="button" title="영상 변경"
+                onClick={() => setMainVideoInputOpen(v => !v)}
+                className="absolute top-3 right-3 z-20 flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold transition-all hover:opacity-80"
+                style={{ background: "rgba(0,0,0,0.6)", border: "1px solid rgba(255,255,255,0.2)", color: "rgba(255,255,255,0.7)" }}>
+                <Icon icon="solar:link-bold" className="w-3 h-3" />
+                URL 변경
+              </button>
+            )}
+            {/* 호스트 URL 입력 */}
+            {isHost && mainVideoInputOpen && (
+              <div className="absolute top-10 right-3 z-30 w-64 rounded-xl p-3 flex flex-col gap-2"
+                style={{ background: "rgba(8,8,20,0.97)", border: "1px solid rgba(0,229,255,0.3)", backdropFilter: "blur(16px)" }}>
+                <p className="text-[10px] text-white/50 tracking-widest">YouTube URL</p>
+                <div className="flex gap-2">
+                  <input value={mainVideoInput}
+                    onChange={e => setMainVideoInput(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+                        const id = extractYouTubeId(mainVideoInput.trim());
+                        if (id) { setMainVideoId(id); setMainVideoPlaying(false); setMainVideoInputOpen(false); setMainVideoInput(""); broadcastContent({ mainVideoId: id, mainVideoPlaying: false }); }
+                      }
+                    }}
+                    placeholder="youtube.com/watch?v=..."
+                    className="flex-1 min-w-0 px-2 py-1.5 rounded-lg text-xs text-white outline-none placeholder-white/20"
+                    style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)" }} />
+                  <button type="button" onClick={() => {
+                    const id = extractYouTubeId(mainVideoInput.trim());
+                    if (id) { setMainVideoId(id); setMainVideoPlaying(false); setMainVideoInputOpen(false); setMainVideoInput(""); broadcastContent({ mainVideoId: id, mainVideoPlaying: false }); }
+                  }}
+                    className="px-2 py-1.5 rounded-lg text-[10px] font-bold"
+                    style={{ background: "rgba(0,229,255,0.12)", border: "1px solid rgba(0,229,255,0.3)", color: "#00E5FF" }}>
+                    적용
+                  </button>
+                </div>
+              </div>
+            )}
+            <button type="button"
               onClick={() => { setMainVideoPlaying(true); broadcastContent({ mainVideoPlaying: true }); }}
               className="relative z-10 w-20 h-20 rounded-full flex items-center justify-center transition-all hover:scale-110 active:scale-95"
               title="재생"
-              style={{ background: "rgba(255,255,255,0.18)", border: "2px solid rgba(255,255,255,0.7)", backdropFilter: "blur(6px)" }}
-            >
+              style={{ background: "rgba(255,255,255,0.18)", border: "2px solid rgba(255,255,255,0.7)", backdropFilter: "blur(6px)" }}>
               <Icon icon="solar:play-bold" className="w-9 h-9 text-white" style={{ marginLeft: 4 }} />
             </button>
             <p className="absolute bottom-3 left-0 right-0 text-center text-[11px] text-white/50 tracking-wider">클릭하여 재생</p>

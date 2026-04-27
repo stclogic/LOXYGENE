@@ -734,19 +734,20 @@ export default function ColosseumRoom001Page() {
   return (
     <div
       className="flex flex-col min-h-screen lg:h-screen lg:overflow-hidden relative overflow-x-hidden"
-      style={
-        "image" in selectedBg && selectedBg.image
-          ? {
-              backgroundImage: `url('${selectedBg.image}')`,
-              backgroundSize: "cover",
-              backgroundPosition: "center",
-              backgroundColor: "rgba(4,4,10,0.82)",
-              backgroundBlendMode: "luminosity",
-            }
-          : "gradient" in selectedBg && selectedBg.gradient
-          ? { background: selectedBg.gradient }
-          : { background: "#070707" }
-      }>
+      style={{ background: "#070707" }}>
+
+      {/* 배경화면 레이어 — 이미지는 실제 밝기, 그라디언트는 그대로 */}
+      {"image" in selectedBg && selectedBg.image ? (
+        <>
+          {/* 배경 이미지 */}
+          <div className="fixed inset-0 pointer-events-none"
+            style={{ zIndex: 0, backgroundImage: `url('${selectedBg.image}')`, backgroundSize: "cover", backgroundPosition: "center" }} />
+          {/* UI 가독성을 위한 얕은 다크 오버레이 */}
+          <div className="fixed inset-0 pointer-events-none" style={{ zIndex: 0, background: "rgba(0,0,0,0.45)" }} />
+        </>
+      ) : "gradient" in selectedBg && selectedBg.gradient ? (
+        <div className="fixed inset-0 pointer-events-none" style={{ zIndex: 0, background: selectedBg.gradient }} />
+      ) : null}
 
       {/* Background effects layer */}
       <ReactiveBackground

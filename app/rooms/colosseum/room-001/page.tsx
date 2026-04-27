@@ -742,8 +742,7 @@ export default function ColosseumRoom001Page() {
           {/* 배경 이미지 */}
           <div className="fixed inset-0 pointer-events-none"
             style={{ zIndex: 0, backgroundImage: `url('${selectedBg.image}')`, backgroundSize: "cover", backgroundPosition: "center" }} />
-          {/* UI 가독성을 위한 얕은 다크 오버레이 */}
-          <div className="fixed inset-0 pointer-events-none" style={{ zIndex: 0, background: "rgba(0,0,0,0.45)" }} />
+          {/* 오버레이 없음 — 100% 밝기 */}
         </>
       ) : "gradient" in selectedBg && selectedBg.gradient ? (
         <div className="fixed inset-0 pointer-events-none" style={{ zIndex: 0, background: selectedBg.gradient }} />
@@ -1675,7 +1674,7 @@ export default function ColosseumRoom001Page() {
                   <div className="flex items-center gap-3">
                     <button type="button"
                       onClick={() => {
-                        const next = Math.max(1.0, parseFloat((cameraZoom - 0.2).toFixed(1)));
+                        const next = Math.max(0.5, parseFloat((cameraZoom - 0.2).toFixed(1)));
                         setCameraZoom(next);
                         setVideoZoom(next);
                       }}
@@ -1685,7 +1684,7 @@ export default function ColosseumRoom001Page() {
                     </button>
                     <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.08)" }}>
                       <div className="h-full rounded-full transition-all"
-                        style={{ width: `${((cameraZoom - 1) / 2) * 100}%`, background: "linear-gradient(90deg, #a78bfa, #7c3aed)" }} />
+                        style={{ width: `${((cameraZoom - 0.5) / 2.5) * 100}%`, background: "linear-gradient(90deg, #a78bfa, #7c3aed)" }} />
                     </div>
                     <button type="button"
                       onClick={() => {
@@ -1701,7 +1700,7 @@ export default function ColosseumRoom001Page() {
                   {cameraZoom > 1.0 && (
                     <button type="button" onClick={() => { setCameraZoom(1.0); setVideoZoom(1.0); }}
                       className="text-[10px] text-white/30 hover:text-white/60 text-right transition-colors">
-                      초기화 (1.0x)
+                      초기화 (1.0x) · 범위 0.5x~3.0x
                     </button>
                   )}
                 </div>

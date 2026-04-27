@@ -841,7 +841,7 @@ export default function ColosseumRoom001Page() {
               onKeyDown={e => {
                 if (e.key === "Enter") {
                   const id = extractYouTubeId(karaokeUrlInput.trim());
-                  if (id) { setKaraokeVideoId(id); setKaraokeInputOpen(false); setKaraokeUrlError(false); broadcastContent({ karaokeVideoId: id }); }
+                  if (id) { setKaraokeVideoId(id); setMainVideoPlaying(false); setKaraokeInputOpen(false); setKaraokeUrlError(false); broadcastContent({ karaokeVideoId: id, mainVideoPlaying: false }); }
                   else setKaraokeUrlError(true);
                 }
               }}
@@ -853,7 +853,7 @@ export default function ColosseumRoom001Page() {
               type="button"
               onClick={() => {
                 const id = extractYouTubeId(karaokeUrlInput.trim());
-                if (id) { setKaraokeVideoId(id); setKaraokeInputOpen(false); setKaraokeUrlError(false); broadcastContent({ karaokeVideoId: id }); }
+                if (id) { setKaraokeVideoId(id); setMainVideoPlaying(false); setKaraokeInputOpen(false); setKaraokeUrlError(false); broadcastContent({ karaokeVideoId: id, mainVideoPlaying: false }); }
                 else setKaraokeUrlError(true);
               }}
               className="flex-shrink-0 px-3 py-2 rounded-lg text-xs font-bold"
@@ -1559,7 +1559,11 @@ export default function ColosseumRoom001Page() {
               </div>
             )}
             <button type="button"
-              onClick={() => { setMainVideoPlaying(true); broadcastContent({ mainVideoPlaying: true }); }}
+              onClick={() => {
+                setMainVideoPlaying(true);
+                setKaraokeVideoId(null); // 카라오케 패널 닫기
+                broadcastContent({ mainVideoPlaying: true, mainVideoId, karaokeVideoId: null });
+              }}
               className="relative z-10 w-20 h-20 rounded-full flex items-center justify-center transition-all hover:scale-110 active:scale-95"
               title="재생"
               style={{ background: "rgba(255,255,255,0.18)", border: "2px solid rgba(255,255,255,0.7)", backdropFilter: "blur(6px)" }}>

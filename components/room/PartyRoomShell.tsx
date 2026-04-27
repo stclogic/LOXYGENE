@@ -266,6 +266,26 @@ export function FloatingPanel({
     window.addEventListener("mouseup", onUp);
   };
 
+  // 터치 리사이즈 (모바일/태블릿)
+  const startTouchResize = (e: React.TouchEvent) => {
+    e.stopPropagation();
+    if (e.touches.length !== 1) return;
+    const t = e.touches[0];
+    resizing.current = true;
+    resizeOrigin.current = { mx: t.clientX, my: t.clientY, w: size.w, h: size.h };
+    const onMove = (ev: TouchEvent) => {
+      if (!resizing.current || ev.touches.length !== 1) return;
+      ev.preventDefault();
+      const tc = ev.touches[0];
+      const rawW = resizeOrigin.current.w + tc.clientX - resizeOrigin.current.mx;
+      const w = Math.max(160, Math.min(window.innerWidth * 0.95, rawW));
+      setSize({ w, h: Math.round(w / aspectRatio) });
+    };
+    const onEnd = () => { resizing.current = false; window.removeEventListener("touchmove", onMove); window.removeEventListener("touchend", onEnd); };
+    window.addEventListener("touchmove", onMove, { passive: false });
+    window.addEventListener("touchend", onEnd);
+  };
+
   if (size.w === 0) return null;
 
   return (
@@ -290,8 +310,9 @@ export function FloatingPanel({
       </div>
       {/* SE resize grip */}
       <div
-        className="absolute bottom-0 right-0 w-7 h-7 flex items-end justify-end p-1.5 cursor-se-resize"
+        className="absolute bottom-0 right-0 w-10 h-10 flex items-end justify-end p-2 cursor-se-resize touch-none"
         onMouseDown={startResize}
+        onTouchStart={startTouchResize}
       >
         <svg width="10" height="10" viewBox="0 0 10 10">
           <line x1="2" y1="10" x2="10" y2="2" stroke="rgba(255,255,255,0.5)" strokeWidth="1.5" strokeLinecap="round"/>

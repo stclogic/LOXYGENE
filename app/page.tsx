@@ -90,7 +90,7 @@ function ControlPanelBody() {
       <div className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
           <h4 className="text-xs font-medium text-white/60 tracking-widest">{t.sidebar.kitStore}</h4>
-          <a className="text-[10px] text-[#00E5FF] hover:underline" href="#">{t.sidebar.viewAll}</a>
+          <a className="text-[10px] text-[#00E5FF] hover:underline" href="/shop">{t.sidebar.viewAll}</a>
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div className="bg-white/[0.02] border border-white/5 rounded-lg p-3 flex flex-col items-center gap-2 hover:bg-white/[0.04] transition-all cursor-pointer group">

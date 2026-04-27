@@ -202,11 +202,26 @@ export function useDailyBroadcast({
     if (!callRef.current || !isHost) return;
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const processor: any =
-        type === "blur"  ? { type: "background-blur",  config: { strength: 0.5 } } :
-        type === "image" ? { type: "background-image", config: { source: imageUrl } } :
-                           { type: "none" };
+      let processor: any;
+
+      if (type === "blur") {
+        processor = { type: "background-blur", config: { strength: 0.5 } };
+      } else if (type === "image" && imageUrl) {
+        // Daily.co는 URL이 아닌 HTMLImageElement를 요구
+        const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+          const el = new Image();
+          el.crossOrigin = "anonymous";
+          el.onload = () => resolve(el);
+          el.onerror = reject;
+          el.src = imageUrl;
+        });
+        processor = { type: "background-image", config: { source: img } };
+      } else {
+        processor = { type: "none" };
+      }
+
       await (callRef.current as any).updateInputSettings({ video: { processor } });
+      console.log("[Daily] background set:", type);
     } catch (e) {
       console.error("[Daily] setBackground failed:", e);
     }

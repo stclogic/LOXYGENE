@@ -736,17 +736,7 @@ export default function ColosseumRoom001Page() {
       className="flex flex-col min-h-screen lg:h-screen lg:overflow-hidden relative overflow-x-hidden"
       style={{ background: "#070707" }}>
 
-      {/* 배경화면 레이어 — 이미지는 실제 밝기, 그라디언트는 그대로 */}
-      {"image" in selectedBg && selectedBg.image ? (
-        <>
-          {/* 배경 이미지 */}
-          <div className="fixed inset-0 pointer-events-none"
-            style={{ zIndex: 0, backgroundImage: `url('${selectedBg.image}')`, backgroundSize: "cover", backgroundPosition: "center" }} />
-          {/* 오버레이 없음 — 100% 밝기 */}
-        </>
-      ) : "gradient" in selectedBg && selectedBg.gradient ? (
-        <div className="fixed inset-0 pointer-events-none" style={{ zIndex: 0, background: selectedBg.gradient }} />
-      ) : null}
+      {/* 배경은 MainStage 내부에서만 적용 */}
 
       {/* Background effects layer */}
       <ReactiveBackground
@@ -1041,8 +1031,16 @@ export default function ColosseumRoom001Page() {
               />
             )}
 
-            {/* Stage background */}
-            <div className="absolute inset-0 bg-[#070707]" style={{ background: "radial-gradient(ellipse at center, rgba(0,229,255,0.04) 0%, #070707 70%)" }} />
+            {/* Stage background — 선택된 배경 100% 밝기 */}
+            {"image" in selectedBg && selectedBg.image ? (
+              <div className="absolute inset-0"
+                style={{ backgroundImage: `url('${selectedBg.image}')`, backgroundSize: "cover", backgroundPosition: "center" }} />
+            ) : "gradient" in selectedBg && selectedBg.gradient ? (
+              <div className="absolute inset-0" style={{ background: selectedBg.gradient }} />
+            ) : (
+              <div className="absolute inset-0"
+                style={{ background: "radial-gradient(ellipse at center, rgba(0,229,255,0.04) 0%, #070707 70%)" }} />
+            )}
 
             {/* Duet test button (host only, shown in stage) */}
             {isHost && !isDuetMode && (
@@ -1069,11 +1067,11 @@ export default function ColosseumRoom001Page() {
 
           {/* ── Chat / Queue panel ─────────────────────────────────────────── */}
           <div className="flex flex-col w-full lg:w-72 lg:flex-shrink-0 max-h-[240px] lg:max-h-none"
-            style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(20px)", borderTop: "1px solid rgba(255,255,255,0.05)" }}>
+            style={{ background: "#0a0a0a", borderTop: "1px solid rgba(255,255,255,0.05)" }}>
 
             {/* Tabs */}
             <div className="flex items-center gap-1 px-2 flex-shrink-0"
-              style={{ borderBottom: "1px solid rgba(255,255,255,0.05)", background: "rgba(0,0,0,0.4)" }}>
+              style={{ borderBottom: "1px solid rgba(255,255,255,0.05)", background: "#0a0a0a" }}>
               {(["chat", "queue"] as const).map(tab => (
                 <button key={tab} onClick={() => setActiveTab(tab)}
                   className="px-3 py-2 text-xs font-medium transition-colors relative"

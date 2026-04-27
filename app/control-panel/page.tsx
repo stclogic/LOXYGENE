@@ -10,6 +10,25 @@ import { Icon } from "@iconify/react";
 
 type Tab = "audio" | "video" | "eq" | "lighting" | "display" | "diagnostics" | "updates" | "theme" | "fnb";
 
+// localStorage 자동 저장/불러오기 유틸
+function useSetting<T>(key: string, def: T): [T, (v: T | ((prev: T) => T)) => void] {
+  const [val, setVal] = useState<T>(() => {
+    if (typeof window === "undefined") return def;
+    try {
+      const s = localStorage.getItem(`loxygene-cp:${key}`);
+      return s !== null ? (JSON.parse(s) as T) : def;
+    } catch { return def; }
+  });
+  const set = useCallback((v: T | ((prev: T) => T)) => {
+    setVal(prev => {
+      const next = typeof v === "function" ? (v as (p: T) => T)(prev) : v;
+      try { localStorage.setItem(`loxygene-cp:${key}`, JSON.stringify(next)); } catch {}
+      return next;
+    });
+  }, [key]);
+  return [val, set];
+}
+
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
     <p className="text-[10px] font-bold tracking-[0.18em] uppercase mb-4" style={{ color: "rgba(255,255,255,0.3)" }}>
@@ -98,22 +117,22 @@ function SegmentButtons({ options, value, onChange }: { options: string[]; value
 // ─────────────────────────────────────────────────────────────
 
 function AudioTab() {
-  const [inputDevice, setInputDevice] = useState("Blue Yeti USB Microphone");
-  const [outputDevice, setOutputDevice] = useState("MacBook Pro 스피커");
-  const [inputVol, setInputVol] = useState(75);
-  const [gain, setGain] = useState(50);
-  const [noiseCancel, setNoiseCancel] = useState(true);
-  const [noiseLv, setNoiseLv] = useState(60);
-  const [echoCancel, setEchoCancel] = useState(true);
-  const [voiceEnhance, setVoiceEnhance] = useState(false);
-  const [voiceMode, setVoiceMode] = useState("자연스러운");
-  const [outputVol, setOutputVol] = useState(80);
-  const [balance, setBalance] = useState(50);
-  const [spatialAudio, setSpatialAudio] = useState(false);
-  const [vcOn, setVcOn] = useState(false);
-  const [vcPreset, setVcPreset] = useState("원본");
-  const [pitch, setPitch] = useState(0);
-  const [reverb, setReverb] = useState(20);
+  const [inputDevice,  setInputDevice]  = useSetting("audio.inputDevice",  "Blue Yeti USB Microphone");
+  const [outputDevice, setOutputDevice] = useSetting("audio.outputDevice", "MacBook Pro 스피커");
+  const [inputVol,     setInputVol]     = useSetting("audio.inputVol",     75);
+  const [gain,         setGain]         = useSetting("audio.gain",         50);
+  const [noiseCancel,  setNoiseCancel]  = useSetting("audio.noiseCancel",  true);
+  const [noiseLv,      setNoiseLv]      = useSetting("audio.noiseLv",      60);
+  const [echoCancel,   setEchoCancel]   = useSetting("audio.echoCancel",   true);
+  const [voiceEnhance, setVoiceEnhance] = useSetting("audio.voiceEnhance", false);
+  const [voiceMode,    setVoiceMode]    = useSetting("audio.voiceMode",    "자연스러운");
+  const [outputVol,    setOutputVol]    = useSetting("audio.outputVol",    80);
+  const [balance,      setBalance]      = useSetting("audio.balance",      50);
+  const [spatialAudio, setSpatialAudio] = useSetting("audio.spatialAudio", false);
+  const [vcOn,         setVcOn]         = useSetting("audio.vcOn",         false);
+  const [vcPreset,     setVcPreset]     = useSetting("audio.vcPreset",     "원본");
+  const [pitch,        setPitch]        = useSetting("audio.pitch",        0);
+  const [reverb,       setReverb]       = useSetting("audio.reverb",       20);
   const [micLevel, setMicLevel] = useState(0);
   const [testing, setTesting] = useState(false);
 
@@ -295,23 +314,23 @@ function AudioTab() {
 // ─────────────────────────────────────────────────────────────
 
 function VideoTab() {
-  const [camera, setCamera] = useState("FaceTime HD Camera");
-  const [mirrored, setMirrored] = useState(true);
-  const [aspect, setAspect] = useState("16:9");
-  const [resolution, setResolution] = useState("1080p");
-  const [fps, setFps] = useState("30fps");
-  const [brightness, setBrightness] = useState(50);
-  const [contrast, setContrast] = useState(50);
-  const [saturation, setSaturation] = useState(50);
-  const [sharpness, setSharpness] = useState(50);
-  const [beautyOn, setBeautyOn] = useState(false);
-  const [skinSmooth, setSkinSmooth] = useState(50);
-  const [whitening, setWhitening] = useState(30);
-  const [eyeCorrect, setEyeCorrect] = useState(false);
-  const [autoHDR, setAutoHDR] = useState(true);
-  const [vbgOn, setVbgOn] = useState(false);
-  const [vbg, setVbg] = useState("없음");
-  const [bgBlur, setBgBlur] = useState(40);
+  const [camera,     setCamera]     = useSetting("video.camera",     "FaceTime HD Camera");
+  const [mirrored,   setMirrored]   = useSetting("video.mirrored",   true);
+  const [aspect,     setAspect]     = useSetting("video.aspect",     "16:9");
+  const [resolution, setResolution] = useSetting("video.resolution", "1080p");
+  const [fps,        setFps]        = useSetting("video.fps",        "30fps");
+  const [brightness, setBrightness] = useSetting("video.brightness", 50);
+  const [contrast,   setContrast]   = useSetting("video.contrast",   50);
+  const [saturation, setSaturation] = useSetting("video.saturation", 50);
+  const [sharpness,  setSharpness]  = useSetting("video.sharpness",  50);
+  const [beautyOn,   setBeautyOn]   = useSetting("video.beautyOn",   false);
+  const [skinSmooth, setSkinSmooth] = useSetting("video.skinSmooth", 50);
+  const [whitening,  setWhitening]  = useSetting("video.whitening",  30);
+  const [eyeCorrect, setEyeCorrect] = useSetting("video.eyeCorrect", false);
+  const [autoHDR,    setAutoHDR]    = useSetting("video.autoHDR",    true);
+  const [vbgOn,      setVbgOn]      = useSetting("video.vbgOn",      false);
+  const [vbg,        setVbg]        = useSetting("video.vbg",        "없음");
+  const [bgBlur,     setBgBlur]     = useSetting("video.bgBlur",     40);
   const [hasStream, setHasStream] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -490,14 +509,14 @@ const EQ_PRESET_ICONS: Record<string, string> = {
 };
 
 function EQTab() {
-  const [bands, setBands] = useState([0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
-  const [compOn, setCompOn] = useState(false);
+  const [bands,      setBands]      = useSetting("eq.bands",      [0,0,0,0,0,0,0,0,0,0]);
+  const [compOn,     setCompOn]     = useSetting("eq.compOn",     false);
   const [compExpanded, setCompExpanded] = useState(false);
-  const [threshold, setThreshold] = useState(-24);
-  const [ratio, setRatio] = useState(4);
-  const [attack, setAttack] = useState(20);
-  const [release, setRelease] = useState(250);
-  const [makeupGain, setMakeupGain] = useState(0);
+  const [threshold,  setThreshold]  = useSetting("eq.threshold",  -24);
+  const [ratio,      setRatio]      = useSetting("eq.ratio",      4);
+  const [attack,     setAttack]     = useSetting("eq.attack",     20);
+  const [release,    setRelease]    = useSetting("eq.release",    250);
+  const [makeupGain, setMakeupGain] = useSetting("eq.makeupGain", 0);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rafRef = useRef<number | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
@@ -664,22 +683,19 @@ function EQTab() {
 // ─────────────────────────────────────────────────────────────
 
 function LightingTab() {
-  const [scanning, setScanning] = useState(false);
-  const [connected, setConnected] = useState(false);
-  const [lightMode, setLightMode] = useState("분위기");
-  const [ambientColor, setAmbientColor] = useState("#00E5FF");
-  const [brightness, setBrightness] = useState(70);
-  const [colorTemp, setColorTemp] = useState(50);
-  const [bpmSens, setBpmSens] = useState(60);
-  const [bpmEffect, setBpmEffect] = useState("Pulse");
-  const [minBright, setMinBright] = useState(20);
-  const [autoCorrect, setAutoCorrect] = useState(true);
-  const [keyLight, setKeyLight] = useState(75);
-  const [fillLight, setFillLight] = useState(40);
-  const [autoLighting, setAutoLighting] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return localStorage.getItem("loxygene-lighting-auto") === "true";
-  });
+  const [scanning,     setScanning]     = useState(false);
+  const [connected,    setConnected]    = useState(false);
+  const [lightMode,    setLightMode]    = useSetting("light.mode",      "분위기");
+  const [ambientColor, setAmbientColor] = useSetting("light.color",     "#00E5FF");
+  const [brightness,   setBrightness]   = useSetting("light.bright",    70);
+  const [colorTemp,    setColorTemp]    = useSetting("light.colorTemp",  50);
+  const [bpmSens,      setBpmSens]      = useSetting("light.bpmSens",    60);
+  const [bpmEffect,    setBpmEffect]    = useSetting("light.bpmEffect",  "Pulse");
+  const [minBright,    setMinBright]    = useSetting("light.minBright",  20);
+  const [autoCorrect,  setAutoCorrect]  = useSetting("light.autoCorrect",true);
+  const [keyLight,     setKeyLight]     = useSetting("light.keyLight",   75);
+  const [fillLight,    setFillLight]    = useSetting("light.fillLight",  40);
+  const [autoLighting, setAutoLighting] = useSetting("light.auto",       false);
 
   const handleAutoLighting = (v: boolean) => {
     setAutoLighting(v);
@@ -806,17 +822,17 @@ function LightingTab() {
 // ─────────────────────────────────────────────────────────────
 
 function DisplayTab() {
-  const [uiSize, setUiSize] = useState("Medium");
-  const [animEffects, setAnimEffects] = useState(true);
-  const [effectIntensity, setEffectIntensity] = useState(70);
-  const [chatPos, setChatPos] = useState("오른쪽");
-  const [participantPos, setParticipantPos] = useState("하단");
-  const [queuePos, setQueuePos] = useState("오른쪽");
-  const [theme, setTheme] = useState("네온 사이버");
-  const [subtitles, setSubtitles] = useState(false);
-  const [subSize, setSubSize] = useState("Medium");
-  const [subPos, setSubPos] = useState("하단");
-  const [subOpacity, setSubOpacity] = useState(70);
+  const [uiSize,          setUiSize]          = useSetting("disp.uiSize",       "Medium");
+  const [animEffects,     setAnimEffects]     = useSetting("disp.animEffects",   true);
+  const [effectIntensity, setEffectIntensity] = useSetting("disp.effectIntens",  70);
+  const [chatPos,         setChatPos]         = useSetting("disp.chatPos",       "오른쪽");
+  const [participantPos,  setParticipantPos]  = useSetting("disp.participantPos","하단");
+  const [queuePos,        setQueuePos]        = useSetting("disp.queuePos",      "오른쪽");
+  const [theme,           setTheme]           = useSetting("disp.theme",         "네온 사이버");
+  const [subtitles,       setSubtitles]       = useSetting("disp.subtitles",     false);
+  const [subSize,         setSubSize]         = useSetting("disp.subSize",       "Medium");
+  const [subPos,          setSubPos]          = useSetting("disp.subPos",        "하단");
+  const [subOpacity,      setSubOpacity]      = useSetting("disp.subOpacity",    70);
 
   const themes = [
     { id: "네온 사이버", icon: "🌊", c1: "#00E5FF", c2: "#FF007F" },
@@ -1212,13 +1228,13 @@ function UpdatesTab() {
 // ─────────────────────────────────────────────────────────────
 
 function ThemeTab() {
-  const [primary, setPrimary] = useState("#00E5FF");
-  const [secondary, setSecondary] = useState("#FF007F");
-  const [bgColor, setBgColor] = useState("#070707");
-  const [font, setFont] = useState("Outfit");
-  const [glowIntensity, setGlowIntensity] = useState(60);
-  const [borderOpacity, setBorderOpacity] = useState(40);
-  const [blurStrength, setBlurStrength] = useState(50);
+  const [primary,       setPrimary]       = useSetting("theme.primary",       "#00E5FF");
+  const [secondary,     setSecondary]     = useSetting("theme.secondary",     "#FF007F");
+  const [bgColor,       setBgColor]       = useSetting("theme.bgColor",       "#070707");
+  const [font,          setFont]          = useSetting("theme.font",          "Outfit");
+  const [glowIntensity, setGlowIntensity] = useSetting("theme.glowIntensity", 60);
+  const [borderOpacity, setBorderOpacity] = useSetting("theme.borderOpacity", 40);
+  const [blurStrength,  setBlurStrength]  = useSetting("theme.blurStrength",  50);
   const [saved, setSaved] = useState(false);
   const [copied, setCopied] = useState(false);
 
@@ -1559,8 +1575,14 @@ const TABS: { id: Tab; icon: string; label: string }[] = [
 
 export default function ControlPanelPage() {
   const [activeTab, setActiveTab] = useState<Tab>("audio");
+  const [saveToast, setSaveToast] = useState(false);
 
   const handleTabChange = (id: Tab) => setActiveTab(id);
+
+  const handleSave = () => {
+    setSaveToast(true);
+    setTimeout(() => setSaveToast(false), 2000);
+  };
 
   const renderContent = () => {
     switch (activeTab) {
@@ -1611,8 +1633,19 @@ export default function ControlPanelPage() {
           <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full flex-shrink-0"
             style={{ background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.22)" }}>
             <div className="w-1.5 h-1.5 rounded-full bg-green-400" />
-            <span className="text-[10px] font-medium text-green-400">시스템 정상</span>
+            <span className="text-[10px] font-medium text-green-400 hidden sm:block">시스템 정상</span>
           </div>
+          {/* 저장 버튼 */}
+          <button
+            type="button"
+            onClick={handleSave}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold transition-all active:scale-95 hover:opacity-90 flex-shrink-0"
+            style={saveToast
+              ? { background: "rgba(34,197,94,0.15)", border: "1px solid rgba(34,197,94,0.4)", color: "#4ade80" }
+              : { background: "rgba(0,229,255,0.12)", border: "1px solid rgba(0,229,255,0.4)", color: "#00E5FF" }}>
+            <Icon icon={saveToast ? "solar:check-circle-bold" : "solar:floppy-disk-bold"} className="w-4 h-4" />
+            {saveToast ? "저장됨 ✓" : "저장"}
+          </button>
         </div>
       </header>
 

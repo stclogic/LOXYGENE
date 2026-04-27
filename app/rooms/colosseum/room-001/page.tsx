@@ -265,6 +265,7 @@ export default function ColosseumRoom001Page() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [speakerVol, setSpeakerVol] = useState(80);
   const [micVol, setMicVol]         = useState(80);
+  const [cameraZoom, setCameraZoom] = useState(1.0); // 1.0 ~ 3.0
   const [selectedBg, setSelectedBg] = useState<RoomBg>(ROOM_BG_OPTIONS[0]);
   // 마스터키 접속자 = isVVIPMember (localStorage)
   const [canUsePremiumBg, setCanUsePremiumBg] = useState(false);
@@ -728,20 +729,21 @@ export default function ColosseumRoom001Page() {
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div className="flex flex-col bg-[#070707] min-h-screen lg:h-screen lg:overflow-hidden relative overflow-x-hidden">
-
-      {/* 선택된 배경 이미지 레이어 */}
-      {"image" in selectedBg && selectedBg.image ? (
-        <div className="fixed inset-0 z-0 pointer-events-none"
-          style={{
-            backgroundImage: `url('${selectedBg.image}')`,
-            backgroundSize: "cover", backgroundPosition: "center",
-            backgroundColor: "rgba(4,4,10,0.75)", backgroundBlendMode: "luminosity",
-          }} />
-      ) : "gradient" in selectedBg && selectedBg.gradient ? (
-        <div className="fixed inset-0 z-0 pointer-events-none"
-          style={{ background: selectedBg.gradient, opacity: 0.8 }} />
-      ) : null}
+    <div
+      className="flex flex-col min-h-screen lg:h-screen lg:overflow-hidden relative overflow-x-hidden"
+      style={
+        "image" in selectedBg && selectedBg.image
+          ? {
+              backgroundImage: `url('${selectedBg.image}')`,
+              backgroundSize: "cover",
+              backgroundPosition: "center",
+              backgroundColor: "rgba(4,4,10,0.82)",
+              backgroundBlendMode: "luminosity",
+            }
+          : "gradient" in selectedBg && selectedBg.gradient
+          ? { background: selectedBg.gradient }
+          : { background: "#070707" }
+      }>
 
       {/* Background effects layer */}
       <ReactiveBackground
@@ -1460,7 +1462,8 @@ export default function ColosseumRoom001Page() {
           defaultY={80}>
           {hostStream ? (
             <video ref={hostVideoRef} autoPlay muted playsInline
-              className="absolute inset-0 w-full h-full object-cover" />
+              className="absolute inset-0 w-full h-full object-cover"
+              style={{ transform: `scale(${cameraZoom})`, transformOrigin: "center center", transition: "transform 0.2s ease" }} />
           ) : (
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-2"
               style={{ background: "rgba(8,8,20,0.9)", backdropFilter: "blur(8px)" }}>
@@ -1612,6 +1615,40 @@ export default function ColosseumRoom001Page() {
             </div>
 
             <div className="px-5 py-4 flex flex-col gap-5">
+              {/* 웹캠 줌 (호스트 전용) */}
+              {isHost && hostStream && (
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-white/60">📷 웹캠 줌</span>
+                    <span className="text-sm font-black tabular-nums" style={{ color: "#a78bfa" }}>{cameraZoom.toFixed(1)}x</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <button type="button"
+                      onClick={() => setCameraZoom(v => Math.max(1.0, parseFloat((v - 0.2).toFixed(1))))}
+                      className="w-10 h-10 rounded-xl flex items-center justify-center text-xl font-black transition-all active:scale-95 hover:opacity-80"
+                      style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.7)" }}>
+                      −
+                    </button>
+                    <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.08)" }}>
+                      <div className="h-full rounded-full transition-all"
+                        style={{ width: `${((cameraZoom - 1) / 2) * 100}%`, background: "linear-gradient(90deg, #a78bfa, #7c3aed)" }} />
+                    </div>
+                    <button type="button"
+                      onClick={() => setCameraZoom(v => Math.min(3.0, parseFloat((v + 0.2).toFixed(1))))}
+                      className="w-10 h-10 rounded-xl flex items-center justify-center text-xl font-black transition-all active:scale-95 hover:opacity-80"
+                      style={{ background: "rgba(167,139,250,0.1)", border: "1px solid rgba(167,139,250,0.3)", color: "#a78bfa" }}>
+                      +
+                    </button>
+                  </div>
+                  {cameraZoom > 1.0 && (
+                    <button type="button" onClick={() => setCameraZoom(1.0)}
+                      className="text-[10px] text-white/30 hover:text-white/60 text-right transition-colors">
+                      초기화 (1.0x)
+                    </button>
+                  )}
+                </div>
+              )}
+
               {/* 방송 음량 */}
               <div className="flex flex-col gap-2">
                 <div className="flex items-center justify-between">

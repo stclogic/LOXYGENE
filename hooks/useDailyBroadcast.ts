@@ -73,21 +73,36 @@ export function useDailyBroadcast({
       const syncParticipants = (ps: Record<string, BroadcastParticipant>) =>
         setParticipants({ ...ps });
 
+      // 원격 참가자 비디오·오디오 구독 강제 활성화
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const subscribeToRemote = (sessionId: string) => {
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (call as any).updateParticipant?.(sessionId, {
+            setSubscribedTracks: { video: true, audio: true, screenVideo: false },
+          });
+        } catch { /* ignore */ }
+      };
+
       call.on("joined-meeting", (e: { participants: Record<string, BroadcastParticipant> }) => {
         if (destroyed) return;
         setJoined(true);
         setStatus("connected");
         setError(null);
-        if (e.participants) syncParticipants(e.participants);
+        if (e.participants) {
+          syncParticipants(e.participants);
+          // 이미 방에 있는 원격 참가자 모두 구독
+          Object.values(e.participants).forEach(p => {
+            if (!p.local) subscribeToRemote(p.session_id);
+          });
+        }
 
         if (isHost) {
-          // 호스트: 마이크 + 카메라 활성화
           call.setLocalAudio(true);
           call.setLocalVideo(true);
           setLocalAudioOn(true);
           setLocalVideoOn(true);
         } else {
-          // 게스트: 마이크 즉시 뮤트, 카메라 off (수신 전용)
           call.setLocalAudio(false);
           call.setLocalVideo(false);
         }
@@ -96,11 +111,23 @@ export function useDailyBroadcast({
       call.on("participant-joined", (e: { participant: BroadcastParticipant }) => {
         if (destroyed) return;
         setParticipants(prev => ({ ...prev, [e.participant.session_id]: e.participant }));
+        if (!e.participant.local) subscribeToRemote(e.participant.session_id);
       });
       call.on("participant-updated", (e: { participant: BroadcastParticipant }) => {
         if (destroyed) return;
         setParticipants(prev => ({ ...prev, [e.participant.session_id]: e.participant }));
+        if (!e.participant.local) subscribeToRemote(e.participant.session_id);
       });
+      // 트랙이 재생 가능 상태가 되면 참가자 정보 즉시 갱신
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      call.on("track-started", (e: any) => {
+        if (destroyed || !e?.participant) return;
+        setParticipants(prev => ({
+          ...prev,
+          [e.participant.session_id]: e.participant,
+        }));
+      });
+
       call.on("participant-left", (e: { participant: BroadcastParticipant }) => {
         if (destroyed) return;
         setParticipants(prev => {

@@ -197,6 +197,9 @@ export default function ColosseumRoom001Page() {
     guestCount,
     hostVideoTrack, hostAudioTrack,
     sendAppMessage,
+    setBackground,
+    setVideoZoom,
+    dailyZoomSupported,
     error: dailyError, status: dailyStatus,
     participants: dailyParticipants,
   } = useDailyBroadcast({
@@ -1615,16 +1618,66 @@ export default function ColosseumRoom001Page() {
             </div>
 
             <div className="px-5 py-4 flex flex-col gap-5">
+              {/* 웹캠 가상 배경 (Daily.co ML 세그멘테이션) — 호스트 전용 */}
+              {isHost && joined && (
+                <div className="flex flex-col gap-2">
+                  <span className="text-xs font-medium text-white/60">🎭 웹캠 가상 배경</span>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {/* 배경 없음 */}
+                    <button type="button"
+                      onClick={() => setBackground("none")}
+                      className="h-12 rounded-xl text-[10px] font-bold text-white/50 transition-all active:scale-95 hover:opacity-80"
+                      style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)" }}>
+                      ❌ 없음
+                    </button>
+                    {/* 블러 */}
+                    <button type="button"
+                      onClick={() => setBackground("blur")}
+                      className="h-12 rounded-xl text-[10px] font-bold transition-all active:scale-95 hover:opacity-80"
+                      style={{ background: "rgba(0,229,255,0.06)", border: "1px solid rgba(0,229,255,0.2)", color: "#00E5FF" }}>
+                      🌫️ 블러
+                    </button>
+                    {/* 프리미엄 이미지들 */}
+                    {ROOM_BG_OPTIONS.filter(bg => "image" in bg && bg.image).map(bg => (
+                      <button key={bg.id} type="button"
+                        onClick={() => "image" in bg && bg.image && setBackground("image", bg.image)}
+                        disabled={"premium" in bg && bg.premium && !canUsePremiumBg}
+                        className="relative h-12 rounded-xl overflow-hidden transition-all active:scale-95 hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed"
+                        style={"image" in bg && bg.image ? {
+                          backgroundImage: `url('${bg.image}')`,
+                          backgroundSize: "cover", backgroundPosition: "center",
+                          backgroundColor: "rgba(4,4,10,0.5)", backgroundBlendMode: "luminosity",
+                        } : {}}>
+                        {"premium" in bg && bg.premium && !canUsePremiumBg && (
+                          <span className="absolute inset-0 flex items-center justify-center text-sm">🔒</span>
+                        )}
+                        <span className="absolute bottom-0.5 left-0 right-0 text-center text-[8px] font-bold text-white drop-shadow-lg">
+                          {bg.label.replace("✨ ", "")}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-[10px] text-white/25">Daily.co AI가 인물을 자동 분리합니다</p>
+                </div>
+              )}
+
               {/* 웹캠 줌 (호스트 전용) */}
               {isHost && hostStream && (
                 <div className="flex flex-col gap-2">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-medium text-white/60">📷 웹캠 줌</span>
-                    <span className="text-sm font-black tabular-nums" style={{ color: "#a78bfa" }}>{cameraZoom.toFixed(1)}x</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-black tabular-nums" style={{ color: "#a78bfa" }}>{cameraZoom.toFixed(1)}x</span>
+                      {dailyZoomSupported && <span className="text-[9px] text-green-400 font-bold">HW</span>}
+                    </div>
                   </div>
                   <div className="flex items-center gap-3">
                     <button type="button"
-                      onClick={() => setCameraZoom(v => Math.max(1.0, parseFloat((v - 0.2).toFixed(1))))}
+                      onClick={() => {
+                        const next = Math.max(1.0, parseFloat((cameraZoom - 0.2).toFixed(1)));
+                        setCameraZoom(next);
+                        setVideoZoom(next);
+                      }}
                       className="w-10 h-10 rounded-xl flex items-center justify-center text-xl font-black transition-all active:scale-95 hover:opacity-80"
                       style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.7)" }}>
                       −
@@ -1634,14 +1687,18 @@ export default function ColosseumRoom001Page() {
                         style={{ width: `${((cameraZoom - 1) / 2) * 100}%`, background: "linear-gradient(90deg, #a78bfa, #7c3aed)" }} />
                     </div>
                     <button type="button"
-                      onClick={() => setCameraZoom(v => Math.min(3.0, parseFloat((v + 0.2).toFixed(1))))}
+                      onClick={() => {
+                        const next = Math.min(3.0, parseFloat((cameraZoom + 0.2).toFixed(1)));
+                        setCameraZoom(next);
+                        setVideoZoom(next);
+                      }}
                       className="w-10 h-10 rounded-xl flex items-center justify-center text-xl font-black transition-all active:scale-95 hover:opacity-80"
                       style={{ background: "rgba(167,139,250,0.1)", border: "1px solid rgba(167,139,250,0.3)", color: "#a78bfa" }}>
                       +
                     </button>
                   </div>
                   {cameraZoom > 1.0 && (
-                    <button type="button" onClick={() => setCameraZoom(1.0)}
+                    <button type="button" onClick={() => { setCameraZoom(1.0); setVideoZoom(1.0); }}
                       className="text-[10px] text-white/30 hover:text-white/60 text-right transition-colors">
                       초기화 (1.0x)
                     </button>

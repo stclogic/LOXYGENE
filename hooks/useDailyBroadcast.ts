@@ -32,7 +32,10 @@ interface UseDailyBroadcastReturn {
   guestCount: number;
   hostVideoTrack: MediaStreamTrack | null;
   hostAudioTrack: MediaStreamTrack | null;
-  sendAppMessage: (data: unknown) => void; // 전체 참가자에게 데이터 전송
+  sendAppMessage: (data: unknown) => void;
+  setBackground: (type: "none" | "blur" | "image", imageUrl?: string) => Promise<void>;
+  setVideoZoom: (level: number) => Promise<void>;
+  dailyZoomSupported: boolean;
   error: string | null;
   status: "idle" | "connecting" | "connected" | "error";
 }
@@ -191,6 +194,46 @@ export function useDailyBroadcast({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, roomUrl, token]);
 
+  // ── 가상 배경 설정 (Daily.co 내장 ML 세그멘테이션) ──────────────────────
+  const setBackground = useCallback(async (
+    type: "none" | "blur" | "image",
+    imageUrl?: string,
+  ) => {
+    if (!callRef.current || !isHost) return;
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const processor: any =
+        type === "blur"  ? { type: "background-blur",  config: { strength: 0.5 } } :
+        type === "image" ? { type: "background-image", config: { source: imageUrl } } :
+                           { type: "none" };
+      await (callRef.current as any).updateInputSettings({ video: { processor } });
+    } catch (e) {
+      console.error("[Daily] setBackground failed:", e);
+    }
+  }, [isHost]);
+
+  // ── 카메라 줌 (MediaTrack constraints → CSS fallback) ────────────────────
+  const [dailyZoomSupported, setDailyZoomSupported] = useState(false);
+  const setVideoZoom = useCallback(async (level: number) => {
+    if (!callRef.current || !isHost) return;
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const local = (callRef.current as any).participants?.()?.local;
+      const track: MediaStreamTrack | null = local?.tracks?.video?.persistentTrack ?? null;
+      if (track) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const caps = (track as any).getCapabilities?.() as any;
+        if (caps?.zoom) {
+          await track.applyConstraints({ advanced: [{ zoom: level } as MediaTrackConstraintSet] });
+          setDailyZoomSupported(true);
+          return;
+        }
+      }
+    } catch { /* zoom not supported by hardware */ }
+    // CSS fallback은 page.tsx에서 별도 처리
+    setDailyZoomSupported(false);
+  }, [isHost]);
+
   const sendAppMessage = useCallback((data: unknown) => {
     if (!callRef.current) return;
     try {
@@ -230,6 +273,9 @@ export function useDailyBroadcast({
     participants, guestCount,
     hostVideoTrack, hostAudioTrack,
     sendAppMessage,
+    setBackground,
+    setVideoZoom,
+    dailyZoomSupported,
     error, status,
   };
 }

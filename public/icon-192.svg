@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" viewBox="0 0 192 192">
+  <rect width="192" height="192" rx="40" fill="#070707"/>
+  <rect width="192" height="192" rx="40" fill="url(#grad)"/>
+  <defs>
+    <radialGradient id="grad" cx="50%" cy="30%" r="70%">
+      <stop offset="0%" stop-color="#00E5FF" stop-opacity="0.15"/>
+      <stop offset="100%" stop-color="#070707" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <text x="96" y="108" font-family="serif" font-size="48" font-weight="300" fill="#00E5FF" text-anchor="middle" letter-spacing="2">L'O</text>
+  <rect x="32" y="120" width="128" height="1" fill="#00E5FF" opacity="0.3"/>
+  <text x="96" y="148" font-family="sans-serif" font-size="13" font-weight="300" fill="#00E5FF" text-anchor="middle" letter-spacing="6" opacity="0.6">OXYGÈNE</text>
+</svg>

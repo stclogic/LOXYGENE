@@ -172,6 +172,11 @@ export default function ColosseumRoom001Page() {
       if (msg.mainVideoPlaying !== undefined) setMainVideoPlaying(Boolean(msg.mainVideoPlaying));
       if (msg.karaokeVideoId   !== undefined) setKaraokeVideoId(msg.karaokeVideoId as string | null);
       if (msg.karaokeLyrics    !== undefined) setKaraokeLyrics(msg.karaokeLyrics as string[]);
+      // 호스트가 선택한 배경화면 게스트 동기화
+      if (msg.selectedBgId !== undefined) {
+        const bg = ROOM_BG_OPTIONS.find(b => b.id === msg.selectedBgId);
+        if (bg) setSelectedBg(bg as RoomBg);
+      }
     }
     // 타이머 동기화 (게스트만 적용)
     if (msg._type === "timer" && !isHost && msg.startTs) {
@@ -1776,7 +1781,12 @@ export default function ColosseumRoom001Page() {
                     const isActive = selectedBg.id === bg.id;
                     return (
                       <button key={bg.id} type="button"
-                        onClick={() => { if (!locked) setSelectedBg(bg as RoomBg); }}
+                        onClick={() => {
+                          if (!locked) {
+                            setSelectedBg(bg as RoomBg);
+                            broadcastContent({ selectedBgId: bg.id });
+                          }
+                        }}
                         className="relative h-14 rounded-xl overflow-hidden flex items-end p-1.5 transition-all"
                         style={{
                           ...("image" in bg && bg.image

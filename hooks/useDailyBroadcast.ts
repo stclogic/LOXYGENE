@@ -48,6 +48,9 @@ export function useDailyBroadcast({
   ready,
   onAppMessage,
 }: UseDailyBroadcastOptions): UseDailyBroadcastReturn {
+  // ref로 관리 → 클로저 스테일 방지 (항상 최신 콜백 실행)
+  const onAppMessageRef = useRef(onAppMessage);
+  useEffect(() => { onAppMessageRef.current = onAppMessage; }, [onAppMessage]);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const callRef = useRef<any>(null);
   const [joined, setJoined] = useState(false);
@@ -161,7 +164,7 @@ export function useDailyBroadcast({
         if (destroyed) return;
         try {
           const data = typeof e.data === "string" ? JSON.parse(e.data) : e.data;
-          onAppMessage?.(data);
+          onAppMessageRef.current?.(data); // ref 사용 → 항상 최신 핸들러 호출
         } catch { /* ignore */ }
       });
 

@@ -168,13 +168,14 @@ export default function ColosseumRoom001Page() {
     }
     // 콘텐츠 동기화 (게스트만 적용)
     if (msg._type === "content" && !isHost) {
-      if (msg.mainVideoId      !== undefined) { setMainVideoId(String(msg.mainVideoId)); setMainVideoPlaying(false); }
+      // mainVideoId: setMainVideoPlaying(false) 제거 — mainVideoPlaying 필드로만 제어
+      if (msg.mainVideoId      !== undefined) setMainVideoId(String(msg.mainVideoId));
       if (msg.mainVideoPlaying !== undefined) setMainVideoPlaying(Boolean(msg.mainVideoPlaying));
       if (msg.karaokeVideoId   !== undefined) setKaraokeVideoId(msg.karaokeVideoId as string | null);
       if (msg.karaokeLyrics    !== undefined) setKaraokeLyrics(msg.karaokeLyrics as string[]);
-      // 호스트가 선택한 배경화면 게스트 동기화
+      // 호스트 배경화면 → 게스트 동기화
       if (msg.selectedBgId !== undefined) {
-        const bg = ROOM_BG_OPTIONS.find(b => b.id === msg.selectedBgId);
+        const bg = ROOM_BG_OPTIONS.find(b => b.id === String(msg.selectedBgId));
         if (bg) setSelectedBg(bg as RoomBg);
       }
     }

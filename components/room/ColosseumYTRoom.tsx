@@ -344,11 +344,11 @@ export default function ColosseumYTRoom({ roomId, nickname, isHost = false }: Co
         {/* Model toggle badge */}
         <Link
           href={`/rooms/colosseum/${roomId}`}
-          className="flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-medium transition-all hover:scale-105"
-          style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.45)" }}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold transition-all hover:scale-105 active:scale-95"
+          style={{ background: "rgba(0,229,255,0.12)", border: "1px solid rgba(0,229,255,0.4)", color: "#00E5FF", boxShadow: "0 0 8px rgba(0,229,255,0.1)" }}
         >
-          <Icon icon="solar:camera-bold" className="w-3 h-3" />
-          Daily.co 모드로 전환
+          <Icon icon="solar:camera-bold" className="w-3.5 h-3.5" />
+          Model A (Daily.co)로 전환
         </Link>
 
         <div className="flex items-center gap-2">

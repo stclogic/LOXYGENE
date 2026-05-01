@@ -250,15 +250,15 @@ export default function ColosseumLobbyPage() {
         </div>
 
         {/* Model A/B switcher */}
-        <div className="flex items-center justify-center gap-3 mb-8">
-          <div className="inline-flex items-center gap-1 p-1 rounded-full" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
-            <span className="px-4 py-1.5 rounded-full text-xs font-bold transition-all" style={{ background: "rgba(0,229,255,0.15)", border: "1px solid rgba(0,229,255,0.35)", color: "#00E5FF" }}>
+        <div className="flex items-center justify-center mb-8">
+          <div className="inline-flex items-center gap-0 p-1 rounded-full" style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.14)" }}>
+            <span className="px-5 py-2 rounded-full text-xs font-bold" style={{ background: "rgba(0,229,255,0.18)", border: "1px solid rgba(0,229,255,0.45)", color: "#00E5FF", boxShadow: "0 0 10px rgba(0,229,255,0.15)" }}>
               A · Daily.co WebRTC
             </span>
             <Link
-              href={`/rooms/colosseum/room-001/yt`}
-              className="px-4 py-1.5 rounded-full text-xs font-medium transition-all hover:scale-105"
-              style={{ background: "rgba(255,255,255,0.03)", color: "rgba(255,255,255,0.4)" }}
+              href="/rooms/colosseum/room-001/yt"
+              className="px-5 py-2 rounded-full text-xs font-bold transition-all hover:scale-105 active:scale-95"
+              style={{ color: "#ffffff", background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.18)" }}
             >
               B · YouTube 방송 🆕
             </Link>

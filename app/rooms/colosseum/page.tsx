@@ -249,6 +249,22 @@ export default function ColosseumLobbyPage() {
           </div>
         </div>
 
+        {/* Model A/B switcher */}
+        <div className="flex items-center justify-center gap-3 mb-8">
+          <div className="inline-flex items-center gap-1 p-1 rounded-full" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
+            <span className="px-4 py-1.5 rounded-full text-xs font-bold transition-all" style={{ background: "rgba(0,229,255,0.15)", border: "1px solid rgba(0,229,255,0.35)", color: "#00E5FF" }}>
+              A · Daily.co WebRTC
+            </span>
+            <Link
+              href={`/rooms/colosseum/room-001/yt`}
+              className="px-4 py-1.5 rounded-full text-xs font-medium transition-all hover:scale-105"
+              style={{ background: "rgba(255,255,255,0.03)", color: "rgba(255,255,255,0.4)" }}
+            >
+              B · YouTube 방송 🆕
+            </Link>
+          </div>
+        </div>
+
         {/* Filter tabs */}
         <div className="flex items-center gap-3 mb-8 flex-wrap">
           {["전체", "발라드", "K-POP", "트로트", "힙합", "재즈", "인디"].map((tab, i) => (

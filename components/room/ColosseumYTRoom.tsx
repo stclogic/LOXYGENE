@@ -316,7 +316,9 @@ export default function ColosseumYTRoom({ roomId, nickname, isHost = false }: Co
   const [participantCount] = useState(127);
   const [leftOpen, setLeftOpen] = useState(true);
   const [timer, setTimer] = useState(0);
-  const channelRef = useRef<ReturnType<typeof getSupabaseClient>["channel"] extends (...args: never[]) => infer R ? R : never | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const channelRef = useRef<any>(null);
+  const videoIdRef = useRef<string | null>(null);   // 호스트 현재 상태 보존용
 
   // Live timer
   useEffect(() => {
@@ -325,42 +327,73 @@ export default function ColosseumYTRoom({ roomId, nickname, isHost = false }: Co
   }, []);
   const fmt = (s: number) => `${String(Math.floor(s / 3600)).padStart(2, "0")}:${String(Math.floor((s % 3600) / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
 
-  // ── Supabase Broadcast sync (DB 스키마 불필요, 즉시 동작) ──────────────
+  // ── Supabase Broadcast + Presence 동기화 ──────────────────────────────
+  // Broadcast : 이미 접속 중인 게스트에게 즉시 전달
+  // Presence  : 나중에 들어온 게스트가 호스트의 현재 상태를 즉시 읽음
   useEffect(() => {
     const supabase = getSupabaseClient();
 
-    // 1) 입장 시 현재 영상 DB에서 로드 (best-effort)
-    supabase.from("rooms").select("youtube_url").eq("id", roomId).single()
-      .then(({ data }) => { if (data?.youtube_url) setVideoId(data.youtube_url as string); });
+    const ch = supabase.channel(`yt-sync:${roomId}`, {
+      config: { presence: { key: nickname } },
+    });
 
-    // 2) Broadcast 채널 구독 — 호스트 영상 변경 이벤트 수신
-    const ch = supabase
-      .channel(`yt-sync:${roomId}`)
-      .on("broadcast", { event: "video-change" }, ({ payload }) => {
-        if (payload?.videoId !== undefined) setVideoId(payload.videoId as string | null);
-      })
-      .subscribe();
+    // 1) 기존 접속자용 — Broadcast 수신
+    ch.on("broadcast", { event: "video-change" }, ({ payload }) => {
+      if (payload?.videoId !== undefined) {
+        setVideoId(payload.videoId as string | null);
+      }
+    });
+
+    // 2) 늦게 들어온 게스트용 — Presence sync
+    //    채널 구독 완료 시 호스트의 현재 상태를 읽어 반영
+    ch.on("presence", { event: "sync" }, () => {
+      if (isHost) return;                          // 호스트는 자기 presence 무시
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const state = ch.presenceState() as Record<string, any[]>;
+      const all = Object.values(state).flat();
+      const hostState = all.find((p) => p.role === "host");
+      if (hostState?.videoId !== undefined) {
+        setVideoId(hostState.videoId as string | null);
+      }
+    });
+
+    ch.subscribe((status: string) => {
+      if (status !== "SUBSCRIBED") return;
+      // 호스트: 구독 완료 즉시 현재 상태 등록
+      if (isHost) {
+        ch.track({ role: "host", videoId: videoIdRef.current });
+      }
+    });
 
     channelRef.current = ch;
     return () => { supabase.removeChannel(ch); };
-  }, [roomId]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roomId, isHost]);
 
-  // 호스트가 영상 바꿀 때 broadcast + 로컬 state 동시 업데이트
+  // 호스트가 영상 바꿀 때: 로컬 state + Broadcast + Presence 갱신
   const handleVideoChange = useCallback((id: string | null) => {
     setVideoId(id);
-    // Broadcast → 모든 게스트에게 즉시 전달
+    videoIdRef.current = id;
+
+    // Broadcast → 이미 접속 중인 게스트에게 즉시
     channelRef.current?.send({
       type: "broadcast",
       event: "video-change",
       payload: { videoId: id },
     });
-    // DB 저장 (best-effort — youtube_url 컬럼 없어도 무방)
+
+    // Presence 갱신 → 이후 입장할 게스트가 sync 이벤트로 읽음
+    if (isHost) {
+      channelRef.current?.track({ role: "host", videoId: id });
+    }
+
+    // DB 저장 (best-effort)
     fetch(`/api/rooms/${roomId}/youtube`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ youtube_url: id }),
     }).catch(() => {});
-  }, [roomId]);
+  }, [roomId, isHost]);
 
   return (
     <div className="h-screen flex flex-col overflow-hidden" style={{ background: "#0a0a0a", color: "white" }}>

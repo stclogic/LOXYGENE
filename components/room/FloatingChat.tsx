@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { Icon } from "@iconify/react";
 import { useRoomChat } from "@/hooks/useRoomChat";
 
@@ -27,6 +28,16 @@ export function FloatingChat({ roomId, nickname, accentColor = "#00E5FF", onClos
   const { messages, sendMessage } = useRoomChat(roomId, nickname);
   const [input, setInput] = useState("");
   const [opacity, setOpacity] = useState(0.82);
+  const [coins, setCoins] = useState<number | null>(null);
+
+  // 게스트 코인 잔액 조회
+  useEffect(() => {
+    if (!pinRight) return;
+    fetch("/api/user/balance")
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.balance !== undefined) setCoins(d.balance); })
+      .catch(() => {});
+  }, [pinRight]);
 
   // Position: default bottom-left, just above bottom bar
   const [pos, setPos] = useState({ x: 12, y: -1 }); // y=-1 signals "not yet placed"
@@ -120,8 +131,37 @@ export function FloatingChat({ roomId, nickname, accentColor = "#00E5FF", onClos
           backdropFilter: "blur(24px)",
         }}
       >
-        {/* Header */}
-        <div className="flex items-center gap-1.5 px-3 py-2.5 flex-shrink-0" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+        {/* 코인 잔액 + 충전 유도 */}
+        <div className="flex-shrink-0 px-3 py-2.5" style={{ background: "rgba(0,229,255,0.05)", borderBottom: "1px solid rgba(0,229,255,0.12)" }}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5">
+              <span className="text-sm">💎</span>
+              <div>
+                <p className="text-[9px] text-white/30 tracking-widest">내 O₂ 코인</p>
+                <p className="text-sm font-black" style={{ color: "#00E5FF" }}>
+                  {coins === null ? "···" : coins.toLocaleString()}
+                  <span className="text-[10px] font-normal text-white/40 ml-1">O₂</span>
+                </p>
+              </div>
+            </div>
+            <Link
+              href="/payments/charge"
+              className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all hover:scale-105 active:scale-95"
+              style={{ background: "linear-gradient(135deg, rgba(0,229,255,0.25), rgba(0,229,255,0.12))", border: "1px solid rgba(0,229,255,0.45)", color: "#00E5FF", boxShadow: "0 0 10px rgba(0,229,255,0.15)" }}
+            >
+              <Icon icon="solar:add-circle-bold" className="w-3.5 h-3.5" />
+              충전
+            </Link>
+          </div>
+          {coins !== null && coins < 1000 && (
+            <p className="text-[10px] mt-1.5 text-center font-medium" style={{ color: "rgba(255,200,0,0.75)" }}>
+              ⚠ 잔액이 부족해요. 지금 충전하면 선물도 보낼 수 있어요!
+            </p>
+          )}
+        </div>
+
+        {/* Chat header */}
+        <div className="flex items-center gap-1.5 px-3 py-2 flex-shrink-0" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
           <Icon icon="solar:chat-round-bold" className="w-3.5 h-3.5" style={{ color: `rgba(${rgb},0.7)` }} />
           <span className="text-[10px] font-bold tracking-widest" style={{ color: `rgba(${rgb},0.7)` }}>
             💬 CHAT

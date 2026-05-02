@@ -1083,8 +1083,8 @@ export function PartyRoomShell({
         </>
       )}
 
-      {/* ── FLOATING OPTIONAL PANEL ── */}
-      {panelOpen && panelContent && (
+      {/* ── FLOATING OPTIONAL PANEL (호스트 전용) ── */}
+      {panelOpen && panelContent && isHost && (
         <div
           ref={panelRef}
           className="absolute z-40 flex flex-col rounded-2xl overflow-hidden"
@@ -1388,8 +1388,8 @@ export function PartyRoomShell({
           />
         </button>
 
-        {/* Optional panel toggle */}
-        {panelContent && (
+        {/* Optional panel toggle — 호스트 전용 */}
+        {panelContent && isHost && (
           <button
             onClick={() => setPanelOpen(v => !v)}
             className="flex-1 h-12 rounded-xl flex items-center justify-center gap-2 font-medium text-sm transition-all active:scale-95 min-w-0"

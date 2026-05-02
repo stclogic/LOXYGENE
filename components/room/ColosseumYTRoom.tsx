@@ -4,7 +4,6 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import { Icon } from "@iconify/react";
 import { getSupabaseClient } from "@/lib/supabase/supabaseClient";
-import { FloatingChat } from "@/components/room/FloatingChat";
 
 // ── helpers ────────────────────────────────────────────────────────────────
 
@@ -15,263 +14,290 @@ function extractYouTubeId(raw: string): string | null {
   return m?.[1] ?? (raw.match(/^[a-zA-Z0-9_-]{11}$/) ? raw : null);
 }
 
-// ── Brick-wall studio background ──────────────────────────────────────────
+// ── Preset playlist ────────────────────────────────────────────────────────
 
-function BrickWallBg() {
+const PRESET_SONGS = [
+  { id: "LW5kMpGAL3o", title: "관광버스 댄스 메들리", artist: "트로트" },
+  { id: "9bZkp7q19f0", title: "Gangnam Style", artist: "PSY" },
+  { id: "CK1tJBVGhMQ", title: "사랑했지만", artist: "김광석" },
+  { id: "O0YGBjRqe_o", title: "첫눈처럼 너에게 가겠다", artist: "에일리" },
+  { id: "2XLZ4Z8styQ", title: "K-POP 파티 메들리", artist: "Various" },
+  { id: "R3iFCa7OYdE", title: "애인이 되어줘", artist: "홍진호" },
+];
+
+// ── Camera view ────────────────────────────────────────────────────────────
+
+function CameraView() {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [status, setStatus] = useState<"pending" | "active" | "error">("pending");
+  const streamRef = useRef<MediaStream | null>(null);
+
+  useEffect(() => {
+    navigator.mediaDevices
+      .getUserMedia({ video: true, audio: false })
+      .then((stream) => {
+        streamRef.current = stream;
+        if (videoRef.current) videoRef.current.srcObject = stream;
+        setStatus("active");
+      })
+      .catch(() => setStatus("error"));
+    return () => streamRef.current?.getTracks().forEach((t) => t.stop());
+  }, []);
+
   return (
-    <div className="absolute inset-0 overflow-hidden" aria-hidden>
-      {/* Base dark warm tone */}
-      <div className="absolute inset-0" style={{ background: "linear-gradient(180deg, #0e0806 0%, #130d09 50%, #0a0704 100%)" }} />
-
-      {/* Brick rows — horizontal mortar lines */}
-      <div className="absolute inset-0" style={{
-        backgroundImage: "repeating-linear-gradient(0deg, transparent, transparent 34px, rgba(0,0,0,0.55) 34px, rgba(0,0,0,0.55) 36px)",
-        backgroundSize: "100% 36px",
-      }} />
-
-      {/* Brick columns — staggered vertical mortar (even rows) */}
-      <div className="absolute inset-0" style={{
-        backgroundImage: "repeating-linear-gradient(90deg, transparent, transparent 118px, rgba(0,0,0,0.55) 118px, rgba(0,0,0,0.55) 120px)",
-        backgroundSize: "120px 72px",
-        backgroundPosition: "0 0",
-      }} />
-
-      {/* Brick columns — staggered vertical mortar (odd rows, offset) */}
-      <div className="absolute inset-0" style={{
-        backgroundImage: "repeating-linear-gradient(90deg, transparent, transparent 118px, rgba(0,0,0,0.55) 118px, rgba(0,0,0,0.55) 120px)",
-        backgroundSize: "120px 72px",
-        backgroundPosition: "60px 36px",
-      }} />
-
-      {/* Warm brick tint */}
-      <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse 120% 80% at 50% 40%, rgba(90,40,15,0.18) 0%, transparent 70%)" }} />
-
-      {/* Luxury gold rim-light — top */}
-      <div className="absolute top-0 left-0 right-0 h-px" style={{ background: "linear-gradient(90deg, transparent 0%, rgba(212,175,55,0.25) 30%, rgba(212,175,55,0.5) 50%, rgba(212,175,55,0.25) 70%, transparent 100%)" }} />
-
-      {/* Subtle vignette */}
-      <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse 100% 100% at 50% 50%, transparent 40%, rgba(0,0,0,0.65) 100%)" }} />
+    <div className="relative w-full h-full bg-[#0a0a0a] rounded-lg overflow-hidden flex items-center justify-center" style={{ border: "1px solid rgba(255,255,255,0.08)" }}>
+      <video ref={videoRef} autoPlay muted playsInline className="w-full h-full object-cover" style={{ display: status === "active" ? "block" : "none" }} />
+      {status !== "active" && (
+        <div className="flex flex-col items-center gap-2 text-white/30">
+          <Icon icon="solar:camera-bold" className="w-7 h-7" />
+          <p className="text-xs">{status === "error" ? "카메라 접근 거부됨" : "카메라 연결 중..."}</p>
+        </div>
+      )}
+      {/* Resize handle — cosmetic */}
+      <div className="absolute bottom-1 right-1 text-white/10">
+        <Icon icon="solar:alt-arrow-right-bold" className="w-3 h-3 rotate-45" />
+      </div>
     </div>
   );
 }
 
-// ── YouTube iframe ─────────────────────────────────────────────────────────
+// ── YouTube embed ──────────────────────────────────────────────────────────
 
-function YouTubeEmbed({ videoId }: { videoId: string | null }) {
+function YouTubeEmbed({ videoId, onClick }: { videoId: string | null; onClick?: () => void }) {
   if (!videoId) {
     return (
-      <div className="w-full h-full flex flex-col items-center justify-center gap-3" style={{ background: "#0a0704" }}>
-        <Icon icon="solar:video-library-bold" className="w-12 h-12 text-white/10" />
-        <p className="text-white/20 text-sm text-center px-4">호스트가 영상을 선택하면<br />여기에 표시됩니다</p>
+      <div
+        className="w-full h-full flex flex-col items-center justify-center gap-2 cursor-pointer select-none rounded-lg"
+        style={{ background: "#111", border: "1px solid rgba(255,255,255,0.08)" }}
+        onClick={onClick}
+      >
+        <Icon icon="solar:play-circle-bold" className="w-10 h-10 text-white/20" />
+        <p className="text-white/30 text-xs">클릭하여 재생</p>
       </div>
     );
   }
-
-  const src = `https://www.youtube.com/embed/${videoId}?autoplay=1&controls=0&modestbranding=1&rel=0&showinfo=0&iv_load_policy=3&disablekb=1&fs=0`;
-
   return (
-    <iframe
-      key={videoId}
-      src={src}
-      className="w-full h-full"
-      allow="autoplay; encrypted-media; picture-in-picture"
-      allowFullScreen
-      style={{ border: "none" }}
-    />
-  );
-}
-
-// ── Host webcam panel ──────────────────────────────────────────────────────
-
-function HostWebcam({ isHost }: { isHost: boolean }) {
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const [active, setActive] = useState(false);
-  const [error, setError] = useState(false);
-  const streamRef = useRef<MediaStream | null>(null);
-
-  const startCam = useCallback(async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-      streamRef.current = stream;
-      if (videoRef.current) videoRef.current.srcObject = stream;
-      setActive(true);
-      setError(false);
-    } catch {
-      setError(true);
-    }
-  }, []);
-
-  const stopCam = useCallback(() => {
-    streamRef.current?.getTracks().forEach((t) => t.stop());
-    streamRef.current = null;
-    if (videoRef.current) videoRef.current.srcObject = null;
-    setActive(false);
-  }, []);
-
-  useEffect(() => () => { streamRef.current?.getTracks().forEach((t) => t.stop()); }, []);
-
-  return (
-    <div className="relative w-full h-full flex flex-col items-center justify-center" style={{ background: "#050302" }}>
-      <video
-        ref={videoRef}
-        autoPlay
-        muted
-        playsInline
-        className="w-full h-full object-cover"
-        style={{ display: active ? "block" : "none" }}
+    <div className="relative w-full h-full rounded-lg overflow-hidden" style={{ border: "1px solid rgba(255,100,0,0.4)", boxShadow: "0 0 20px rgba(255,100,0,0.15)" }}>
+      <iframe
+        key={videoId}
+        src={`https://www.youtube.com/embed/${videoId}?autoplay=1&controls=1&modestbranding=1&rel=0&showinfo=0`}
+        className="w-full h-full"
+        allow="autoplay; encrypted-media; picture-in-picture"
+        allowFullScreen
+        style={{ border: "none" }}
       />
-
-      {!active && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4">
-          <div className="w-14 h-14 rounded-full flex items-center justify-center" style={{ background: "rgba(0,229,255,0.08)", border: "1px solid rgba(0,229,255,0.2)" }}>
-            <Icon icon="solar:camera-bold" className="w-6 h-6 text-[#00E5FF]/50" />
-          </div>
-          {isHost ? (
-            <>
-              <p className="text-white/30 text-xs text-center">호스트 캠을 켜세요</p>
-              {error && <p className="text-red-400/70 text-[10px] text-center">카메라 접근이 거부됐어요</p>}
-              <button
-                onClick={startCam}
-                className="text-xs px-4 py-2 rounded-lg font-medium transition-all hover:scale-105"
-                style={{ background: "rgba(0,229,255,0.12)", border: "1px solid rgba(0,229,255,0.3)", color: "#00E5FF" }}
-              >
-                카메라 켜기
-              </button>
-            </>
-          ) : (
-            <p className="text-white/20 text-xs text-center">호스트 캠 대기 중</p>
-          )}
-        </div>
-      )}
-
-      {active && isHost && (
-        <button
-          onClick={stopCam}
-          aria-label="카메라 끄기"
-          className="absolute bottom-2 right-2 w-7 h-7 rounded-full flex items-center justify-center transition-all hover:scale-110"
-          style={{ background: "rgba(239,68,68,0.3)", border: "1px solid rgba(239,68,68,0.5)" }}
-        >
-          <Icon icon="solar:camera-slash-bold" className="w-3.5 h-3.5 text-red-400" />
-        </button>
-      )}
-    </div>
-  );
-}
-
-// ── Host YouTube URL control panel ────────────────────────────────────────
-
-function HostYTControl({
-  roomId,
-  currentVideoId,
-  onVideoChange,
-}: {
-  roomId: string;
-  currentVideoId: string | null;
-  onVideoChange: (id: string | null) => void;
-}) {
-  const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [err, setErr] = useState("");
-
-  const handleSet = async () => {
-    setErr("");
-    const id = extractYouTubeId(input.trim());
-    if (!id) { setErr("올바른 YouTube URL을 입력해주세요."); return; }
-    setLoading(true);
-    try {
-      const res = await fetch(`/api/rooms/${roomId}/youtube`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ youtube_url: id }),
-      });
-      if (res.ok) {
-        onVideoChange(id);
-        setInput("");
-      } else {
-        const d = await res.json();
-        setErr(d.error ?? "오류가 발생했습니다.");
-      }
-    } catch {
-      setErr("네트워크 오류");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleClear = async () => {
-    setLoading(true);
-    await fetch(`/api/rooms/${roomId}/youtube`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ youtube_url: null }),
-    });
-    onVideoChange(null);
-    setInput("");
-    setLoading(false);
-  };
-
-  return (
-    <div className="flex items-center gap-2 px-3 py-2" style={{ background: "rgba(0,0,0,0.6)", borderTop: "1px solid rgba(255,255,255,0.06)" }}>
-      <Icon icon="solar:tv-bold" className="w-3.5 h-3.5 text-[#00E5FF]/60 flex-shrink-0" />
-      <input
-        value={input}
-        onChange={(e) => { setInput(e.target.value); setErr(""); }}
-        onKeyDown={(e) => { if (e.key === "Enter") handleSet(); }}
-        placeholder="YouTube URL 또는 영상 ID"
-        className="flex-1 min-w-0 bg-transparent text-white text-xs outline-none placeholder-white/20"
-      />
-      {err && <span className="text-red-400 text-[10px] flex-shrink-0">{err}</span>}
-      {currentVideoId && (
-        <button
-          onClick={handleClear}
-          disabled={loading}
-          className="flex-shrink-0 px-2 py-1 rounded text-[10px] font-medium"
-          style={{ background: "rgba(239,68,68,0.15)", border: "1px solid rgba(239,68,68,0.3)", color: "#ef4444" }}
-        >
-          중지
-        </button>
-      )}
+      {/* URL 변경 badge */}
       <button
-        onClick={handleSet}
-        disabled={loading || !input.trim()}
-        className="flex-shrink-0 px-2 py-1 rounded text-[10px] font-medium disabled:opacity-40"
-        style={{ background: "rgba(0,229,255,0.12)", border: "1px solid rgba(0,229,255,0.3)", color: "#00E5FF" }}
+        className="absolute top-2 right-2 flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium text-white/70 hover:text-white transition-colors"
+        style={{ background: "rgba(0,0,0,0.6)", border: "1px solid rgba(255,255,255,0.15)" }}
+        onClick={onClick}
+        aria-label="URL 변경"
       >
-        {loading ? "..." : "재생"}
+        <Icon icon="solar:link-bold" className="w-3 h-3" />
+        URL 변경
       </button>
     </div>
   );
 }
 
-// ── Participant chip row ───────────────────────────────────────────────────
+// ── Left panel ─────────────────────────────────────────────────────────────
 
-const MOCK_GUESTS = [
-  { id: "g1", name: "별빛가수",   color: "#00E5FF" },
-  { id: "g2", name: "달빛연인",   color: "#FF007F" },
-  { id: "g3", name: "봄날의꿈",   color: "#7C3AED" },
-  { id: "g4", name: "가을바람",   color: "#F59E0B" },
-  { id: "g5", name: "구름위에",   color: "#10B981" },
+function LeftPanel({
+  roomId,
+  videoId,
+  onVideoChange,
+  isHost,
+}: {
+  roomId: string;
+  videoId: string | null;
+  onVideoChange: (id: string | null) => void;
+  isHost: boolean;
+}) {
+  const [urlInput, setUrlInput] = useState("");
+  const [urlError, setUrlError] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [lyricsText, setLyricsText] = useState("");
+  const [lyricsEdit, setLyricsEdit] = useState(false);
+
+  const handlePlay = useCallback(async () => {
+    const id = extractYouTubeId(urlInput.trim());
+    if (!id) { setUrlError(true); return; }
+    setUrlError(false);
+
+    if (isHost) {
+      setLoading(true);
+      await fetch(`/api/rooms/${roomId}/youtube`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ youtube_url: id }),
+      }).catch(() => null);
+      setLoading(false);
+    }
+    onVideoChange(id);
+    setUrlInput("");
+  }, [urlInput, isHost, roomId, onVideoChange]);
+
+  const handlePreset = async (id: string) => {
+    if (isHost) {
+      await fetch(`/api/rooms/${roomId}/youtube`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ youtube_url: id }),
+      }).catch(() => null);
+    }
+    onVideoChange(id);
+  };
+
+  const lyricsLines = lyricsText.split("\n").filter((l) => l.trim());
+
+  return (
+    <div className="flex flex-col h-full gap-3">
+      {/* YouTube URL input */}
+      <div className="rounded-xl p-3 flex flex-col gap-2.5" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(139,92,246,0.3)" }}>
+        <p className="text-[10px] font-bold tracking-widest text-white/40">YouTube URL 입력</p>
+        <div className="flex gap-1.5">
+          <input
+            value={urlInput}
+            onChange={(e) => { setUrlInput(e.target.value); setUrlError(false); }}
+            onKeyDown={(e) => { if (e.key === "Enter") handlePlay(); }}
+            placeholder="youtube.com/watch?v=... 또는 ID"
+            className="flex-1 min-w-0 bg-transparent text-white text-xs outline-none placeholder-white/20"
+            style={{ background: "rgba(255,255,255,0.05)", border: `1px solid ${urlError ? "rgba(239,68,68,0.5)" : "rgba(255,255,255,0.1)"}`, borderRadius: "6px", padding: "6px 8px" }}
+          />
+          <button
+            onClick={handlePlay}
+            disabled={loading || !urlInput.trim()}
+            className="flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold text-white disabled:opacity-40 transition-all hover:opacity-90"
+            style={{ background: "#7C3AED" }}
+          >
+            {loading ? "..." : "재생"}
+          </button>
+        </div>
+        {urlError && <p className="text-[10px] text-red-400">올바른 YouTube URL을 입력해주세요.</p>}
+      </div>
+
+      {/* Lyrics */}
+      <div className="rounded-xl p-3 flex flex-col gap-2" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}>
+        <div className="flex items-center justify-between">
+          <p className="text-[10px] font-bold tracking-widest text-white/40">가사 입력 (선택)</p>
+          <button
+            onClick={() => setLyricsEdit((v) => !v)}
+            className="text-[10px] px-2 py-0.5 rounded transition-all"
+            style={{ background: lyricsEdit ? "rgba(0,229,255,0.12)" : "rgba(255,255,255,0.05)", color: lyricsEdit ? "#00E5FF" : "rgba(255,255,255,0.35)", border: `1px solid ${lyricsEdit ? "rgba(0,229,255,0.3)" : "rgba(255,255,255,0.08)"}` }}
+          >
+            {lyricsEdit ? "완료" : "편집"}
+          </button>
+        </div>
+        {lyricsEdit ? (
+          <textarea
+            value={lyricsText}
+            onChange={(e) => setLyricsText(e.target.value)}
+            placeholder={"가사를 한 줄씩 입력하면\n화면 하단에 표시됩니다"}
+            rows={5}
+            className="w-full text-xs text-white outline-none resize-none placeholder-white/20"
+            style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(0,229,255,0.2)", borderRadius: "6px", padding: "6px 8px", lineHeight: 1.7 }}
+          />
+        ) : (
+          <p className="text-[11px] text-white/25 leading-relaxed">
+            {lyricsLines.length > 0 ? lyricsLines[0] + (lyricsLines.length > 1 ? ` +${lyricsLines.length - 1}줄` : "") : "가사 입력 버튼을 눌러 가사를 추가하면 무대 하단에 표시됩니다"}
+          </p>
+        )}
+      </div>
+
+      {/* Playlist */}
+      <div className="flex-1 rounded-xl p-3 flex flex-col gap-2 overflow-hidden" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}>
+        <p className="text-[10px] font-bold tracking-widest text-white/40">추천 플레이리스트</p>
+        <div className="flex flex-col gap-1 overflow-y-auto flex-1" style={{ scrollbarWidth: "none" }}>
+          {PRESET_SONGS.map((song, i) => (
+            <button
+              key={song.id}
+              onClick={() => handlePreset(song.id)}
+              className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left transition-all hover:scale-[1.01] group"
+              style={{
+                background: videoId === song.id ? "rgba(0,229,255,0.08)" : "rgba(255,255,255,0.02)",
+                border: `1px solid ${videoId === song.id ? "rgba(0,229,255,0.2)" : "rgba(255,255,255,0.05)"}`,
+              }}
+            >
+              <span className="text-[10px] font-black w-4 text-center flex-shrink-0" style={{ color: videoId === song.id ? "#00E5FF" : "rgba(255,255,255,0.2)" }}>
+                {i + 1}
+              </span>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs text-white/80 truncate group-hover:text-white transition-colors">{song.title}</p>
+                <p className="text-[10px] text-white/30 truncate">{song.artist}</p>
+              </div>
+              {videoId === song.id && <Icon icon="solar:play-bold" className="w-3 h-3 text-[#00E5FF] flex-shrink-0 animate-pulse" />}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Chat panel ─────────────────────────────────────────────────────────────
+
+const MOCK_CHAT = [
+  { id: "c1", name: "별빛가수", text: "안녕하세요~", color: "#00E5FF" },
+  { id: "c2", name: "달빛연인", text: "오늘 노래 최고다!", color: "#FF007F" },
+  { id: "c3", name: "봄날의꿈", text: "다음 곡은 뭐예요?", color: "#7C3AED" },
 ];
 
-function ParticipantRow({ count }: { count: number }) {
+function ChatPanel({ participantCount }: { participantCount: number }) {
+  const [input, setInput] = useState("");
+  const [messages, setMessages] = useState(MOCK_CHAT);
+
+  const send = () => {
+    if (!input.trim()) return;
+    setMessages((prev) => [...prev, { id: Date.now().toString(), name: "나", text: input.trim(), color: "#00E5FF" }]);
+    setInput("");
+  };
+
   return (
-    <div className="flex items-center gap-2 px-3 py-2 flex-wrap" style={{ background: "#000000" }}>
-      <div className="flex -space-x-2">
-        {MOCK_GUESTS.slice(0, 5).map((g) => (
-          <div
-            key={g.id}
-            className="w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-bold flex-shrink-0"
-            style={{ background: g.color + "22", border: `1.5px solid ${g.color}66`, color: g.color, zIndex: 1 }}
-            title={g.name}
-          >
-            {g.name[0]}
+    <div className="flex flex-col h-full" style={{ background: "#000", borderLeft: "1px solid rgba(255,255,255,0.06)" }}>
+      {/* Tabs */}
+      <div className="flex items-center" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+        <button className="flex-1 py-2.5 text-xs font-bold text-white/80 flex items-center justify-center gap-1" style={{ borderBottom: "2px solid #00E5FF" }}>
+          <Icon icon="solar:chat-round-bold" className="w-3.5 h-3.5" /> 채팅
+        </button>
+        <button className="flex-1 py-2.5 text-xs text-white/30 flex items-center justify-center gap-1">
+          <Icon icon="solar:music-note-bold" className="w-3.5 h-3.5" /> 대기열
+        </button>
+        <div className="px-3 py-2.5 flex items-center gap-1 text-[10px] text-white/30">
+          <div className="w-1.5 h-1.5 rounded-full bg-green-400" />
+          {participantCount}명
+        </div>
+      </div>
+
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto px-3 py-2 flex flex-col gap-2" style={{ scrollbarWidth: "none" }}>
+        {messages.map((m) => (
+          <div key={m.id} className="flex items-start gap-1.5">
+            <span className="text-[10px] font-bold flex-shrink-0" style={{ color: m.color }}>{m.name}</span>
+            <span className="text-[11px] text-white/70 leading-relaxed">{m.text}</span>
           </div>
         ))}
       </div>
-      <span className="text-white/30 text-[10px]">{count}명 참여 중</span>
-      <div className="ml-auto flex items-center gap-1.5">
-        <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-        <span className="text-red-400 text-[10px] font-bold tracking-wider">LIVE</span>
+
+      {/* Input */}
+      <div className="px-3 py-2 flex gap-2" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+        <input
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") send(); }}
+          placeholder="채팅 입력..."
+          className="flex-1 min-w-0 bg-transparent text-white text-xs outline-none placeholder-white/20"
+          style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "8px", padding: "6px 10px" }}
+        />
+        <button onClick={send} aria-label="전송" className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: "rgba(0,229,255,0.15)", border: "1px solid rgba(0,229,255,0.3)" }}>
+          <Icon icon="solar:arrow-right-bold" className="w-4 h-4 text-[#00E5FF]" />
+        </button>
+      </div>
+
+      {/* Reaction buttons */}
+      <div className="flex justify-around py-2 px-2" style={{ borderTop: "1px solid rgba(255,255,255,0.04)" }}>
+        {["🌹", "⭐", "🔥", "💝", "👏"].map((e) => (
+          <button key={e} className="text-lg hover:scale-125 transition-transform active:scale-95">{e}</button>
+        ))}
       </div>
     </div>
   );
@@ -287,196 +313,142 @@ interface ColosseumYTRoomProps {
 
 export default function ColosseumYTRoom({ roomId, nickname, isHost = false }: ColosseumYTRoomProps) {
   const [videoId, setVideoId] = useState<string | null>(null);
-  const [participantCount, setParticipantCount] = useState(127);
-  const [chatOpen, setChatOpen] = useState(false);
+  const [participantCount] = useState(127);
+  const [leftOpen, setLeftOpen] = useState(true);
+  const [timer, setTimer] = useState(0);
 
-  // ── Supabase Realtime: sync youtube_url for all guests ────────────────
+  // Live timer
+  useEffect(() => {
+    const t = setInterval(() => setTimer((s) => s + 1), 1000);
+    return () => clearInterval(t);
+  }, []);
+  const fmt = (s: number) => `${String(Math.floor(s / 3600)).padStart(2, "0")}:${String(Math.floor((s % 3600) / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
+
+  // Supabase Realtime sync
   useEffect(() => {
     const supabase = getSupabaseClient();
+    supabase.from("rooms").select("youtube_url").eq("id", roomId).single()
+      .then(({ data }) => { if (data?.youtube_url) setVideoId(data.youtube_url); });
 
-    // Fetch current state
-    supabase
-      .from("rooms")
-      .select("youtube_url, participant_count")
-      .eq("id", roomId)
-      .single()
-      .then(({ data }) => {
-        if (data?.youtube_url) setVideoId(data.youtube_url);
-        if (data?.participant_count) setParticipantCount(data.participant_count);
-      });
-
-    // Subscribe to realtime updates
     const channel = supabase
       .channel(`colosseum-yt:${roomId}`)
-      .on(
-        "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "rooms", filter: `id=eq.${roomId}` },
-        (payload) => {
-          const row = payload.new as Record<string, string | number | null>;
-          if ("youtube_url" in row) setVideoId(row.youtube_url as string | null);
-          if ("participant_count" in row && typeof row.participant_count === "number") {
-            setParticipantCount(row.participant_count);
-          }
-        }
-      )
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "rooms", filter: `id=eq.${roomId}` }, (payload) => {
+        const row = payload.new as Record<string, unknown>;
+        if ("youtube_url" in row) setVideoId(row.youtube_url as string | null);
+      })
       .subscribe();
-
     return () => { supabase.removeChannel(channel); };
   }, [roomId]);
 
   return (
-    <div className="relative min-h-screen flex flex-col overflow-hidden" style={{ fontFamily: "inherit" }}>
+    <div className="h-screen flex flex-col overflow-hidden" style={{ background: "#0a0a0a", color: "white" }}>
 
-      {/* ── Background ──────────────────────────────────────────────────── */}
-      <BrickWallBg />
-
-      {/* ── Top nav bar ─────────────────────────────────────────────────── */}
-      <div className="relative z-10 flex items-center justify-between px-4 py-2.5" style={{ background: "rgba(0,0,0,0.55)", backdropFilter: "blur(12px)", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-        <Link
-          href="/rooms/colosseum"
-          className="flex items-center gap-1.5 text-xs font-medium transition-colors"
-          style={{ color: "rgba(255,255,255,0.4)" }}
-        >
-          <Icon icon="solar:arrow-left-bold" className="w-4 h-4" />
-          THE COLOSSEUM
+      {/* ── Top nav ─────────────────────────────────────────────────────── */}
+      <div className="flex-shrink-0 flex items-center justify-between px-4 py-2" style={{ background: "#000", borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
+        <Link href="/rooms/colosseum" className="text-xs font-medium text-white/50 hover:text-white transition-colors flex items-center gap-1">
+          <Icon icon="solar:arrow-left-bold" className="w-3.5 h-3.5" />
+          L&apos;OXYGÈNE
         </Link>
 
-        {/* Model toggle badge */}
-        <Link
-          href={`/rooms/colosseum/${roomId}`}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold transition-all hover:scale-105 active:scale-95"
-          style={{ background: "rgba(0,229,255,0.12)", border: "1px solid rgba(0,229,255,0.4)", color: "#00E5FF", boxShadow: "0 0 8px rgba(0,229,255,0.1)" }}
-        >
-          <Icon icon="solar:camera-bold" className="w-3.5 h-3.5" />
-          Model A (Daily.co)로 전환
-        </Link>
+        <div className="flex items-center gap-3">
+          <span className="text-sm font-black tracking-widest text-white">THE COLOSSEUM</span>
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full" style={{ background: "rgba(239,68,68,0.15)", border: "1px solid rgba(239,68,68,0.3)" }}>
+            <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+            <span className="text-[10px] font-bold text-red-400">LIVE</span>
+            <span className="text-[10px] font-mono text-white/60">{fmt(timer)}</span>
+          </div>
+        </div>
 
         <div className="flex items-center gap-2">
-          <div className="w-1.5 h-1.5 rounded-full bg-red-500" style={{ boxShadow: "0 0 6px rgba(239,68,68,0.8)", animation: "pulse 1.5s ease-in-out infinite" }} />
-          <span className="text-xs font-medium" style={{ color: "rgba(255,255,255,0.55)" }}>{nickname}</span>
-          {isHost && (
-            <span className="text-[9px] px-1.5 py-0.5 rounded-full font-bold" style={{ background: "rgba(212,175,55,0.2)", border: "1px solid rgba(212,175,55,0.4)", color: "#d4af37" }}>HOST</span>
-          )}
+          <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-medium text-white/60" style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)" }}>
+            <Icon icon="solar:users-group-rounded-bold" className="w-3.5 h-3.5" />
+            {participantCount}
+          </div>
+          <Link
+            href={`/rooms/colosseum/${roomId}`}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-bold text-[#00E5FF]"
+            style={{ background: "rgba(0,229,255,0.1)", border: "1px solid rgba(0,229,255,0.3)" }}
+          >
+            <Icon icon="solar:camera-bold" className="w-3.5 h-3.5" />
+            Model A (Daily.co)
+          </Link>
         </div>
       </div>
 
-      {/* ── L'OXYGÈNE center logo ────────────────────────────────────────── */}
-      <div className="relative z-10 flex items-center justify-center py-2" style={{ background: "rgba(0,0,0,0.3)" }}>
-        <h1
-          className="text-xl font-black tracking-[0.3em] select-none"
-          style={{
-            color: "#00E5FF",
-            textShadow: "0 0 12px rgba(0,229,255,0.8), 0 0 30px rgba(0,229,255,0.4), 0 0 60px rgba(0,229,255,0.15)",
-            letterSpacing: "0.35em",
-          }}
+      {/* ── Sub toolbar ─────────────────────────────────────────────────── */}
+      <div className="flex-shrink-0 flex items-center gap-2 px-4 py-2" style={{ background: "#000", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+        {isHost && (
+          <button className="text-xs px-2 py-1 rounded text-white/40 text-[10px]" style={{ background: "rgba(255,0,127,0.12)", border: "1px solid rgba(255,0,127,0.25)", color: "#FF007F" }}>
+            디렉터 호출
+          </button>
+        )}
+        <button
+          onClick={() => setLeftOpen((v) => !v)}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all"
+          style={{ background: leftOpen ? "rgba(0,229,255,0.1)" : "rgba(255,255,255,0.05)", border: `1px solid ${leftOpen ? "rgba(0,229,255,0.3)" : "rgba(255,255,255,0.08)"}`, color: leftOpen ? "#00E5FF" : "rgba(255,255,255,0.5)" }}
         >
-          L&apos;OXYGÈNE
-        </h1>
+          <Icon icon="solar:music-note-bold" className="w-3.5 h-3.5" />
+          🎵 노래방 {leftOpen ? "ON" : "OFF"}
+        </button>
+        <span className="text-white/20 text-xs">|</span>
+        <span className="text-[10px] text-white/30">{nickname}</span>
+        {isHost && <span className="text-[9px] px-1.5 py-0.5 rounded font-bold" style={{ background: "rgba(212,175,55,0.15)", border: "1px solid rgba(212,175,55,0.35)", color: "#d4af37" }}>HOST</span>}
       </div>
 
-      {/* ── Main stage: 7:3 split ────────────────────────────────────────── */}
-      <div className="relative z-10 flex flex-1 gap-2 px-3 pb-2 min-h-0" style={{ height: "calc(100vh - 220px)" }}>
+      {/* ── Main content ─────────────────────────────────────────────────── */}
+      <div className="flex-1 flex overflow-hidden min-h-0">
 
-        {/* Left 70% — YouTube content */}
-        <div className="relative flex flex-col overflow-hidden rounded-xl" style={{ flex: "7", border: "1px solid rgba(255,255,255,0.07)", boxShadow: "0 0 30px rgba(0,0,0,0.6)" }}>
-          {/* Gold top accent */}
-          <div className="absolute top-0 left-0 right-0 h-px z-10" style={{ background: "linear-gradient(90deg, transparent, rgba(212,175,55,0.3), transparent)" }} />
+        {/* Left panel */}
+        {leftOpen && (
+          <div className="w-64 flex-shrink-0 overflow-y-auto p-3" style={{ background: "#000", borderRight: "1px solid rgba(255,255,255,0.06)" }}>
+            <LeftPanel roomId={roomId} videoId={videoId} onVideoChange={setVideoId} isHost={isHost} />
+          </div>
+        )}
 
+        {/* Center: YouTube (top) + Camera (bottom) */}
+        <div className="flex-1 flex flex-col gap-2 p-3 min-w-0">
+          {/* YouTube — flex-[2] = 2/3 of vertical space */}
+          <div className="flex-[2] min-h-0">
+            <YouTubeEmbed videoId={videoId} onClick={() => setLeftOpen(true)} />
+          </div>
+
+          {/* Camera — flex-[1] = 1/3 of vertical space */}
           <div className="flex-1 min-h-0">
-            <YouTubeEmbed videoId={videoId} />
+            <CameraView />
           </div>
-
-          {/* Host URL control bar — only visible to host */}
-          {isHost && (
-            <HostYTControl
-              roomId={roomId}
-              currentVideoId={videoId}
-              onVideoChange={setVideoId}
-            />
-          )}
-
-          {/* Currently playing badge */}
-          {videoId && (
-            <div className="absolute top-3 left-3 flex items-center gap-1.5 px-2 py-1 rounded-lg z-10" style={{ background: "rgba(0,0,0,0.6)", border: "1px solid rgba(0,229,255,0.2)", backdropFilter: "blur(8px)" }}>
-              <div className="w-1.5 h-1.5 rounded-full bg-[#00E5FF] animate-pulse" />
-              <span className="text-[10px] text-[#00E5FF] font-medium">재생 중</span>
-            </div>
-          )}
         </div>
 
-        {/* Right 30% — Host webcam */}
-        <div className="relative flex flex-col overflow-hidden rounded-xl" style={{ flex: "3", border: "1px solid rgba(255,255,255,0.07)", boxShadow: "0 0 30px rgba(0,0,0,0.6)" }}>
-          {/* Gold top accent */}
-          <div className="absolute top-0 left-0 right-0 h-px z-10" style={{ background: "linear-gradient(90deg, transparent, rgba(212,175,55,0.3), transparent)" }} />
-
-          <div className="flex-1 min-h-0">
-            <HostWebcam isHost={isHost} />
-          </div>
-
-          {/* Label */}
-          <div className="absolute bottom-2 left-2 px-2 py-0.5 rounded text-[9px] font-medium" style={{ background: "rgba(0,0,0,0.7)", color: "rgba(255,255,255,0.4)", border: "1px solid rgba(255,255,255,0.08)" }}>
-            HOST CAM
-          </div>
+        {/* Right: Chat */}
+        <div className="w-72 flex-shrink-0" style={{ background: "#000" }}>
+          <ChatPanel participantCount={participantCount} />
         </div>
       </div>
 
-      {/* ── Solid black footer ───────────────────────────────────────────── */}
-      <div className="relative z-10 flex-shrink-0" style={{ background: "#000000" }}>
-        {/* Participant row */}
-        <ParticipantRow count={participantCount} />
-
-        {/* Action bar */}
-        <div className="flex items-center gap-2 px-3 py-2.5" style={{ background: "#000000", borderTop: "1px solid rgba(255,255,255,0.05)" }}>
-          {/* Chat toggle */}
-          <button
-            onClick={() => setChatOpen((v) => !v)}
-            aria-label="채팅"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all hover:scale-105"
-            style={{
-              background: chatOpen ? "rgba(0,229,255,0.12)" : "rgba(255,255,255,0.05)",
-              border: chatOpen ? "1px solid rgba(0,229,255,0.3)" : "1px solid rgba(255,255,255,0.08)",
-              color: chatOpen ? "#00E5FF" : "rgba(255,255,255,0.5)",
-            }}
-          >
-            <Icon icon="solar:chat-round-bold" className="w-4 h-4" />
-            채팅
+      {/* ── Bottom bar ───────────────────────────────────────────────────── */}
+      <div className="flex-shrink-0 flex items-center justify-between px-6 py-3" style={{ background: "#000", borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-lg flex-shrink-0" style={{ background: "rgba(255,0,127,0.3)" }} />
+          <div className="w-8 h-8 rounded-lg flex-shrink-0" style={{ background: "rgba(0,229,255,0.3)" }} />
+        </div>
+        <button
+          className="flex items-center gap-2 px-6 py-2.5 rounded-full font-bold text-sm transition-all hover:scale-105 active:scale-95"
+          style={{ background: "rgba(0,229,255,0.15)", border: "1px solid rgba(0,229,255,0.4)", color: "#00E5FF", boxShadow: "0 0 16px rgba(0,229,255,0.15)" }}
+        >
+          <Icon icon="solar:microphone-bold" className="w-4 h-4" />
+          마이크 잡기
+        </button>
+        <div className="flex items-center gap-2">
+          <button className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold text-white" style={{ background: "rgba(255,0,127,0.2)", border: "1px solid rgba(255,0,127,0.4)" }}>
+            <Icon icon="solar:gift-bold" className="w-3.5 h-3.5" /> 꽃다발
           </button>
-
-          {/* Gift */}
-          <button
-            aria-label="선물"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all hover:scale-105"
-            style={{ background: "rgba(255,0,127,0.1)", border: "1px solid rgba(255,0,127,0.25)", color: "#FF007F" }}
-          >
-            <Icon icon="solar:gift-bold" className="w-4 h-4" />
-            선물
+          <button className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold text-white" style={{ background: "rgba(212,175,55,0.15)", border: "1px solid rgba(212,175,55,0.35)" }}>
+            <Icon icon="solar:star-bold" className="w-3.5 h-3.5" /> 샴페인
           </button>
-
-          {/* Karaoke queue */}
-          <button
-            aria-label="신청곡"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all hover:scale-105"
-            style={{ background: "rgba(124,58,237,0.1)", border: "1px solid rgba(124,58,237,0.25)", color: "#7C3AED" }}
-          >
-            <Icon icon="solar:microphone-bold" className="w-4 h-4" />
-            신청곡
+          <button aria-label="설정" className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.08)" }}>
+            <Icon icon="solar:settings-bold" className="w-4 h-4 text-white/40" />
           </button>
-
-          <div className="flex-1" />
-
-          {/* Room ID badge */}
-          <span className="text-[10px] font-mono" style={{ color: "rgba(255,255,255,0.2)" }}>
-            #{roomId.slice(-6)}
-          </span>
         </div>
       </div>
-
-      {/* ── Floating chat ────────────────────────────────────────────────── */}
-      {chatOpen && (
-        <div className="fixed bottom-24 left-4 w-72 z-50">
-          <FloatingChat roomId={roomId} nickname={nickname} accentColor="#00E5FF" onClose={() => setChatOpen(false)} />
-        </div>
-      )}
     </div>
   );
 }

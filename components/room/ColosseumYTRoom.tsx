@@ -316,6 +316,7 @@ export default function ColosseumYTRoom({ roomId, nickname, isHost = false }: Co
   const [participantCount] = useState(127);
   const [leftOpen, setLeftOpen] = useState(true);
   const [timer, setTimer] = useState(0);
+  const channelRef = useRef<ReturnType<typeof getSupabaseClient>["channel"] extends (...args: never[]) => infer R ? R : never | null>(null);
 
   // Live timer
   useEffect(() => {
@@ -324,20 +325,41 @@ export default function ColosseumYTRoom({ roomId, nickname, isHost = false }: Co
   }, []);
   const fmt = (s: number) => `${String(Math.floor(s / 3600)).padStart(2, "0")}:${String(Math.floor((s % 3600) / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
 
-  // Supabase Realtime sync
+  // ── Supabase Broadcast sync (DB 스키마 불필요, 즉시 동작) ──────────────
   useEffect(() => {
     const supabase = getSupabaseClient();
-    supabase.from("rooms").select("youtube_url").eq("id", roomId).single()
-      .then(({ data }) => { if (data?.youtube_url) setVideoId(data.youtube_url); });
 
-    const channel = supabase
-      .channel(`colosseum-yt:${roomId}`)
-      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "rooms", filter: `id=eq.${roomId}` }, (payload) => {
-        const row = payload.new as Record<string, unknown>;
-        if ("youtube_url" in row) setVideoId(row.youtube_url as string | null);
+    // 1) 입장 시 현재 영상 DB에서 로드 (best-effort)
+    supabase.from("rooms").select("youtube_url").eq("id", roomId).single()
+      .then(({ data }) => { if (data?.youtube_url) setVideoId(data.youtube_url as string); });
+
+    // 2) Broadcast 채널 구독 — 호스트 영상 변경 이벤트 수신
+    const ch = supabase
+      .channel(`yt-sync:${roomId}`)
+      .on("broadcast", { event: "video-change" }, ({ payload }) => {
+        if (payload?.videoId !== undefined) setVideoId(payload.videoId as string | null);
       })
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+
+    channelRef.current = ch;
+    return () => { supabase.removeChannel(ch); };
+  }, [roomId]);
+
+  // 호스트가 영상 바꿀 때 broadcast + 로컬 state 동시 업데이트
+  const handleVideoChange = useCallback((id: string | null) => {
+    setVideoId(id);
+    // Broadcast → 모든 게스트에게 즉시 전달
+    channelRef.current?.send({
+      type: "broadcast",
+      event: "video-change",
+      payload: { videoId: id },
+    });
+    // DB 저장 (best-effort — youtube_url 컬럼 없어도 무방)
+    fetch(`/api/rooms/${roomId}/youtube`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ youtube_url: id }),
+    }).catch(() => {});
   }, [roomId]);
 
   return (
@@ -401,7 +423,7 @@ export default function ColosseumYTRoom({ roomId, nickname, isHost = false }: Co
         {/* Left panel */}
         {leftOpen && (
           <div className="w-64 flex-shrink-0 overflow-y-auto p-3" style={{ background: "#000", borderRight: "1px solid rgba(255,255,255,0.06)" }}>
-            <LeftPanel roomId={roomId} videoId={videoId} onVideoChange={setVideoId} isHost={isHost} />
+            <LeftPanel roomId={roomId} videoId={videoId} onVideoChange={handleVideoChange} isHost={isHost} />
           </div>
         )}
 

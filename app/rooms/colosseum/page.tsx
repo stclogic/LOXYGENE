@@ -121,6 +121,7 @@ interface CreateRoomForm {
   maxParticipants: number;
   hasPassword: boolean;
   password: string;
+  mode: "daily" | "youtube";
 }
 
 export default function ColosseumLobbyPage() {
@@ -132,6 +133,7 @@ export default function ColosseumLobbyPage() {
     maxParticipants: 10,
     hasPassword: false,
     password: "",
+    mode: "daily",
   });
   const [rooms, setRooms] = useState<RoomItem[]>([...INITIAL_ROOMS, ...SAMPLE_ROOMS]);
   const [creating, setCreating] = useState(false);
@@ -181,7 +183,10 @@ export default function ColosseumLobbyPage() {
       });
       const data = await res.json();
       if (data.roomId) {
-        router.push(`/rooms/colosseum/${data.roomId}`);
+        const dest = form.mode === "youtube"
+          ? `/rooms/colosseum/${data.roomId}/yt`
+          : `/rooms/colosseum/${data.roomId}`;
+        router.push(dest);
       } else {
         setCreateError(data.error ?? "방 만들기 실패");
       }
@@ -421,6 +426,37 @@ export default function ColosseumLobbyPage() {
               </button>
             </div>
             <div className="space-y-5">
+              {/* 방송 모드 선택 */}
+              <div>
+                <label className="block text-white/60 text-sm mb-2 font-medium">방송 모드</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setForm({ ...form, mode: "daily" })}
+                    className="flex flex-col items-center gap-1.5 py-3 rounded-xl text-sm font-bold transition-all"
+                    style={form.mode === "daily"
+                      ? { background: "rgba(0,229,255,0.15)", border: "2px solid rgba(0,229,255,0.6)", color: "#00E5FF" }
+                      : { background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.4)" }}
+                  >
+                    <Icon icon="solar:camera-bold" className="w-5 h-5" />
+                    <span>📡 WebRTC 화상</span>
+                    <span className="text-[10px] font-normal opacity-60">Daily.co 기반</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setForm({ ...form, mode: "youtube" })}
+                    className="flex flex-col items-center gap-1.5 py-3 rounded-xl text-sm font-bold transition-all"
+                    style={form.mode === "youtube"
+                      ? { background: "rgba(255,0,127,0.15)", border: "2px solid rgba(255,0,127,0.6)", color: "#FF007F" }
+                      : { background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.4)" }}
+                  >
+                    <Icon icon="solar:play-stream-bold" className="w-5 h-5" />
+                    <span>🎬 YouTube 방송</span>
+                    <span className="text-[10px] font-normal opacity-60">노래방·방송형</span>
+                  </button>
+                </div>
+              </div>
+
               <div>
                 <label className="block text-white/60 text-sm mb-2 font-medium">방 제목</label>
                 <input type="text" placeholder="예: 오늘 밤 발라드 파티 🎵"

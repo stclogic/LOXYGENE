@@ -1193,12 +1193,23 @@ export function PartyRoomShell({
       )}
 
       {/* ── FLOATING CHAT ── */}
-      {chatOpen && (
+      {isHost ? (
+        chatOpen && (
+          <FloatingChat
+            roomId={roomId}
+            nickname={nickname}
+            accentColor={accentColor}
+            onClose={() => setChatOpen(false)}
+          />
+        )
+      ) : (
+        /* 게스트: 우측에 항상 고정 */
         <FloatingChat
           roomId={roomId}
           nickname={nickname}
           accentColor={accentColor}
-          onClose={() => setChatOpen(false)}
+          onClose={() => {}}
+          pinRight
         />
       )}
 

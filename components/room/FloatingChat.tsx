@@ -9,6 +9,8 @@ interface Props {
   nickname: string;
   accentColor?: string;
   onClose: () => void;
+  /** 게스트 모드: 우측에 고정 패널로 표시, 닫기 버튼 없음 */
+  pinRight?: boolean;
 }
 
 // Accent hex → "r,g,b" for rgba() usage
@@ -21,7 +23,7 @@ function hexToRgb(hex: string): string {
 const MIN_W = 220;
 const MIN_H = 260;
 
-export function FloatingChat({ roomId, nickname, accentColor = "#00E5FF", onClose }: Props) {
+export function FloatingChat({ roomId, nickname, accentColor = "#00E5FF", onClose, pinRight = false }: Props) {
   const { messages, sendMessage } = useRoomChat(roomId, nickname);
   const [input, setInput] = useState("");
   const [opacity, setOpacity] = useState(0.82);
@@ -102,6 +104,69 @@ export function FloatingChat({ roomId, nickname, accentColor = "#00E5FF", onClos
   };
 
   const rgb = hexToRgb(accentColor);
+
+  // ── 게스트 우측 고정 패널 모드 ──────────────────────────────────────────
+  if (pinRight) {
+    return (
+      <div
+        className="fixed z-30 flex flex-col"
+        style={{
+          right: 0,
+          top: 56,        // 상단 nav 높이
+          bottom: 72,     // 하단 바 높이
+          width: 272,
+          background: "rgba(2,4,14,0.88)",
+          borderLeft: "1px solid rgba(255,255,255,0.08)",
+          backdropFilter: "blur(24px)",
+        }}
+      >
+        {/* Header */}
+        <div className="flex items-center gap-1.5 px-3 py-2.5 flex-shrink-0" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+          <Icon icon="solar:chat-round-bold" className="w-3.5 h-3.5" style={{ color: `rgba(${rgb},0.7)` }} />
+          <span className="text-[10px] font-bold tracking-widest" style={{ color: `rgba(${rgb},0.7)` }}>
+            💬 CHAT
+          </span>
+        </div>
+        {/* Messages */}
+        <div className="flex-1 px-3 py-2 flex flex-col gap-2 overflow-y-auto" style={{ scrollbarWidth: "none" }}>
+          {messages.map(m => (
+            <div key={m.id} className="flex flex-col gap-0.5">
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] font-bold" style={{ color: m.isOwn ? accentColor : `rgba(${rgb},0.7)` }}>{m.name}</span>
+                <span className="text-[9px] text-white/20">{m.time}</span>
+              </div>
+              <p className="text-xs text-white/75 leading-relaxed break-words">{m.text}</p>
+            </div>
+          ))}
+          <div ref={messagesEndRef} />
+        </div>
+        {/* Input */}
+        <div className="px-3 py-2 flex-shrink-0" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+          <div className="flex gap-2 items-end">
+            <textarea
+              ref={inputRef}
+              value={input}
+              onChange={e => setInput(e.target.value)}
+              onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
+              placeholder="채팅 입력..."
+              rows={1}
+              className="flex-1 resize-none text-white text-xs outline-none rounded-xl px-3 py-2 placeholder:text-white/20"
+              style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", maxHeight: 80 }}
+            />
+            <button
+              type="button"
+              aria-label="전송"
+              onClick={handleSend}
+              className="flex-shrink-0 w-8 h-8 rounded-xl flex items-center justify-center transition-all hover:scale-110"
+              style={{ background: `rgba(${rgb},0.2)`, border: `1px solid rgba(${rgb},0.4)` }}
+            >
+              <Icon icon="solar:arrow-right-bold" className="w-4 h-4" style={{ color: accentColor }} />
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Don't render until position is computed (avoids top-0 flash)
   if (pos.y === -1) return null;

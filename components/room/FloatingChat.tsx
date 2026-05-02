@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
 import { Icon } from "@iconify/react";
 import { useRoomChat } from "@/hooks/useRoomChat";
+import ChargeModal from "@/components/room/ChargeModal";
 
 interface Props {
   roomId: string;
@@ -29,14 +29,16 @@ export function FloatingChat({ roomId, nickname, accentColor = "#00E5FF", onClos
   const [input, setInput] = useState("");
   const [opacity, setOpacity] = useState(0.82);
   const [coins, setCoins] = useState<number | null>(null);
+  const [chargeOpen, setChargeOpen] = useState(false);
 
   // 게스트 코인 잔액 조회
   useEffect(() => {
     if (!pinRight) return;
-    fetch("/api/user/balance")
+    const load = () => fetch("/api/user/balance")
       .then(r => r.ok ? r.json() : null)
       .then(d => { if (d?.balance !== undefined) setCoins(d.balance); })
       .catch(() => {});
+    load();
   }, [pinRight]);
 
   // Position: default bottom-left, just above bottom bar
@@ -119,6 +121,7 @@ export function FloatingChat({ roomId, nickname, accentColor = "#00E5FF", onClos
   // ── 게스트 우측 고정 패널 모드 ──────────────────────────────────────────
   if (pinRight) {
     return (
+      <>
       <div
         className="fixed z-30 flex flex-col"
         style={{
@@ -144,14 +147,15 @@ export function FloatingChat({ roomId, nickname, accentColor = "#00E5FF", onClos
                 </p>
               </div>
             </div>
-            <Link
-              href="/payments/charge"
+            <button
+              type="button"
+              onClick={() => setChargeOpen(true)}
               className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all hover:scale-105 active:scale-95"
               style={{ background: "linear-gradient(135deg, rgba(0,229,255,0.25), rgba(0,229,255,0.12))", border: "1px solid rgba(0,229,255,0.45)", color: "#00E5FF", boxShadow: "0 0 10px rgba(0,229,255,0.15)" }}
             >
               <Icon icon="solar:add-circle-bold" className="w-3.5 h-3.5" />
               충전
-            </Link>
+            </button>
           </div>
           {coins !== null && coins < 1000 && (
             <p className="text-[10px] mt-1.5 text-center font-medium" style={{ color: "rgba(255,200,0,0.75)" }}>
@@ -205,6 +209,16 @@ export function FloatingChat({ roomId, nickname, accentColor = "#00E5FF", onClos
           </div>
         </div>
       </div>
+
+      {/* 충전 모달 — 방을 떠나지 않고 팝업으로 처리 */}
+      {chargeOpen && (
+        <ChargeModal
+          currentBalance={coins ?? 0}
+          onClose={() => setChargeOpen(false)}
+          onSuccess={(newBal) => { setCoins(newBal); setChargeOpen(false); }}
+        />
+      )}
+      </>
     );
   }
 

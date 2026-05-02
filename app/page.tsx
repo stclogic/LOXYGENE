@@ -1203,9 +1203,18 @@ function Home() {
                 <h3 className="text-lg tracking-tight font-medium text-white/90 group-hover:text-[#00E5FF] transition-colors">{t.cards.roomKing.title}</h3>
                 <p className="text-xs font-light text-white/50 mt-1">{t.cards.roomKing.desc}</p>
               </div>
-              <div className="z-10 mt-auto pt-4 flex gap-2 w-full">
-                <Link href="/rooms/colosseum" className="flex-1 py-2.5 rounded bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/20 text-xs font-medium text-white/80 transition-all text-center">{t.cards.roomKing.create}</Link>
-                <Link href="/rooms/colosseum" className="flex-1 py-2.5 rounded bg-[#00E5FF]/10 hover:bg-[#00E5FF]/20 border border-[#00E5FF]/30 hover:border-[#00E5FF] text-xs font-medium text-[#00E5FF] hover:shadow-[0_0_10px_rgba(0,229,255,0.3)] transition-all text-center">{t.cards.roomKing.join}</Link>
+              <div className="z-10 mt-auto pt-4 flex flex-col gap-2 w-full">
+                <div className="flex gap-2">
+                  <Link href="/rooms/colosseum" className="flex-1 py-2.5 rounded bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/20 text-xs font-medium text-white/80 transition-all text-center">{t.cards.roomKing.create}</Link>
+                  <Link href="/rooms/colosseum" className="flex-1 py-2.5 rounded bg-[#00E5FF]/10 hover:bg-[#00E5FF]/20 border border-[#00E5FF]/30 hover:border-[#00E5FF] text-xs font-medium text-[#00E5FF] hover:shadow-[0_0_10px_rgba(0,229,255,0.3)] transition-all text-center">{t.cards.roomKing.join}</Link>
+                </div>
+                <Link
+                  href="/rooms/colosseum/room-001/yt"
+                  className="w-full py-2.5 rounded text-xs font-bold text-center text-white transition-all hover:opacity-90 active:scale-95"
+                  style={{ background: "linear-gradient(90deg, #FF007F, #cc0066)", boxShadow: "0 0 12px rgba(255,0,127,0.35)" }}
+                >
+                  🆕 B · YouTube 방송 모드로 입장
+                </Link>
               </div>
             </div>
 

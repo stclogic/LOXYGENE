@@ -249,20 +249,14 @@ export default function ColosseumLobbyPage() {
           </div>
 
           {/* Model A/B switcher */}
-          <div className="flex items-center justify-center gap-2 mt-6">
-            <span className="text-white/30 text-xs">방송 모델 선택</span>
-            <div className="flex items-center rounded-xl overflow-hidden" style={{ border: "1px solid rgba(255,255,255,0.15)" }}>
-              <span className="px-4 py-2 text-xs font-bold" style={{ background: "#00E5FF", color: "#000" }}>
-                A · Daily.co
-              </span>
-              <Link
-                href="/rooms/colosseum/room-001/yt"
-                className="px-4 py-2 text-xs font-bold"
-                style={{ background: "#FF007F", color: "#fff" }}
-              >
-                B · YouTube 🆕
-              </Link>
-            </div>
+          <div className="mt-6 flex justify-center">
+            <Link
+              href="/rooms/colosseum/room-001/yt"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-bold text-white transition-all hover:opacity-90 active:scale-95"
+              style={{ background: "linear-gradient(90deg,#FF007F,#cc0066)", boxShadow: "0 0 16px rgba(255,0,127,0.45)" }}
+            >
+              🆕 B · YouTube 방송 모드 입장
+            </Link>
           </div>
         </div>
 

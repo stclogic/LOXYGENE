@@ -247,21 +247,22 @@ export default function ColosseumLobbyPage() {
               현재 <span className="text-[#FF007F] font-bold">{totalUsers.toLocaleString()}</span>명 접속 중
             </span>
           </div>
-        </div>
 
-        {/* Model A/B switcher */}
-        <div className="flex items-center justify-center mb-8">
-          <div className="inline-flex items-center gap-0 p-1 rounded-full" style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.14)" }}>
-            <span className="px-5 py-2 rounded-full text-xs font-bold" style={{ background: "rgba(0,229,255,0.18)", border: "1px solid rgba(0,229,255,0.45)", color: "#00E5FF", boxShadow: "0 0 10px rgba(0,229,255,0.15)" }}>
-              A · Daily.co WebRTC
-            </span>
-            <Link
-              href="/rooms/colosseum/room-001/yt"
-              className="px-5 py-2 rounded-full text-xs font-bold transition-all hover:scale-105 active:scale-95"
-              style={{ color: "#ffffff", background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.18)" }}
-            >
-              B · YouTube 방송 🆕
-            </Link>
+          {/* Model A/B switcher */}
+          <div className="flex items-center justify-center gap-2 mt-6">
+            <span className="text-white/30 text-xs">방송 모델 선택</span>
+            <div className="flex items-center rounded-xl overflow-hidden" style={{ border: "1px solid rgba(255,255,255,0.15)" }}>
+              <span className="px-4 py-2 text-xs font-bold" style={{ background: "#00E5FF", color: "#000" }}>
+                A · Daily.co
+              </span>
+              <Link
+                href="/rooms/colosseum/room-001/yt"
+                className="px-4 py-2 text-xs font-bold"
+                style={{ background: "#FF007F", color: "#fff" }}
+              >
+                B · YouTube 🆕
+              </Link>
+            </div>
           </div>
         </div>
 
